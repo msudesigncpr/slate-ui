@@ -1,5 +1,9 @@
+import asyncio
+import logging
 import sys
+from enum import Enum
 
+import PySide6.QtAsyncio as QtAsyncio
 from PyQt6.QtCore import QSize, Qt
 from PyQt6.QtWidgets import (
     QApplication,
@@ -17,6 +21,13 @@ from PyQt6.QtWidgets import (
     QLineEdit,
 )
 
+
+class State(Enum):
+    IDLE = 0
+    RUNNING = 1
+    PAUSED = 2
+
+
 def generate_spinbox_layout(label_text, min_bound, max_bound, default_val):
     layout = QHBoxLayout()
 
@@ -29,6 +40,7 @@ def generate_spinbox_layout(label_text, min_bound, max_bound, default_val):
     layout.addWidget(label)
     layout.addWidget(spinbox)
     return layout
+
 
 def generate_pdish_layout(name):
     layout = QHBoxLayout()
@@ -48,6 +60,7 @@ class MainWindow(QMainWindow):
         super().__init__()
 
         self.setWindowTitle("CPR Slate Interface")
+        self.state = State.IDLE
         #  self.setMinimumSize(1000, 1000)
         widget = QWidget()
         layout = QGridLayout(widget)
@@ -59,7 +72,9 @@ class MainWindow(QMainWindow):
         basic_setup.setLayout(basic_setup_lay)
 
         pdish_count_lay = generate_spinbox_layout("Number of Petri Dishes:", 1, 6, 6)
-        dwellt_ster_lay = generate_spinbox_layout("Sterilizer Dwell Time (s):", 0, 1000, 20.0)
+        dwellt_ster_lay = generate_spinbox_layout(
+            "Sterilizer Dwell Time (s):", 0, 1000, 20.0
+        )
         dwellt_cool_lay = generate_spinbox_layout("Cooling Time (s):", 0, 1000, 5.0)
 
         basic_setup_lay.addLayout(pdish_count_lay)
@@ -96,8 +111,11 @@ class MainWindow(QMainWindow):
         sampling_act_label = QLabel("Current State: ")
         sampling_act_status_msg = QLabel("N/A")
 
-        start_button = QPushButton()
-        start_button.setText("START")
+        self.start_button = QPushButton()
+        self.start_button.setText("START")
+        self.start_button.clicked.connect(
+            lambda: asyncio.create_task(self.start_clicked())
+        )
 
         stop_button = QPushButton()
         stop_button.setText("STOP")
@@ -106,7 +124,7 @@ class MainWindow(QMainWindow):
         sampling_status_lay.addWidget(sampling_act_label, 1, 0)
         sampling_status_lay.addWidget(sampling_act_status_msg, 1, 1)
         sampling_status_lay.setColumnStretch(1, 1)
-        sampling_status_lay.addWidget(start_button, 1, 2)
+        sampling_status_lay.addWidget(self.start_button, 1, 2)
         sampling_status_lay.addWidget(stop_button, 1, 3)
 
         layout.addWidget(sampling_status, 1, 0, 1, 2)
@@ -117,10 +135,21 @@ class MainWindow(QMainWindow):
 
         self.setCentralWidget(widget)
 
+    async def start_clicked(self):
+        match self.state:
+            case State.IDLE | State.PAUSED:
+                self.state = State.RUNNING
+                # TODO Start the thing!
+                self.start_button.setText("PAUSE")
+            case State.RUNNING:
+                self.state = State.PAUSED
+                # TODO Pause the thing!
+                self.start_button.setText("RESUME")
 
-app = QApplication(sys.argv)
 
-window = MainWindow()
-window.show()
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
 
-sys.exit(app.exec())
+    window = MainWindow()
+    window.show()
+    QtAsyncio.run()
