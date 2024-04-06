@@ -8,51 +8,26 @@ from PyQt6.QtCore import QSize, Qt
 from PyQt6.QtWidgets import (
     QApplication,
     QMainWindow,
-    QGroupBox,
-    QPushButton,
-    QSpinBox,
     QWidget,
+    QGroupBox,
     QGridLayout,
-    QLabel,
     QHBoxLayout,
     QVBoxLayout,
-    QDoubleSpinBox,
-    QProgressBar,
+    QLabel,
     QLineEdit,
+    QProgressBar,
+    QPushButton,
+    QSpinBox,
+    QDoubleSpinBox,
 )
+
+from generators import generate_spinbox_layout, generate_pdish_layout
 
 
 class State(Enum):
     IDLE = 0
     RUNNING = 1
     PAUSED = 2
-
-
-def generate_spinbox_layout(label_text, min_bound, max_bound, default_val):
-    layout = QHBoxLayout()
-
-    label = QLabel(label_text)
-
-    spinbox = QSpinBox() if isinstance(default_val, int) else QDoubleSpinBox()
-    spinbox.setRange(min_bound, max_bound)
-    spinbox.setValue(default_val)
-
-    layout.addWidget(label)
-    layout.addWidget(spinbox)
-    return layout
-
-
-def generate_pdish_layout(name):
-    layout = QHBoxLayout()
-    label = QLabel(f"Petri Dish {name}: ")
-
-    selection = QLineEdit()
-    selection.setMaxLength(16)
-    selection.setText(f"P{name}")
-
-    layout.addWidget(label)
-    layout.addWidget(selection)
-    return layout
 
 
 class MainWindow(QMainWindow):
@@ -68,20 +43,25 @@ class MainWindow(QMainWindow):
         # BEGIN BASIC SETUP LAYOUT
 
         basic_setup = QGroupBox("Basic Setup")
-        basic_setup_lay = QVBoxLayout()
-        basic_setup.setLayout(basic_setup_lay)
+        self.basic_setup_lay = QVBoxLayout()
+        basic_setup.setLayout(self.basic_setup_lay)
 
-        pdish_count_lay = generate_spinbox_layout("Number of Petri Dishes:", 1, 6, 6)
-        dwellt_ster_lay = generate_spinbox_layout(
+        pdish_count_lay, self.pdish_count = generate_spinbox_layout(
+            "Number of Petri Dishes:", 1, 6, 6
+        )
+        self.pdish_count.valueChanged.connect(self.set_status_pdish_entry_fields)
+        dwellt_ster_lay, self.dwellt_ster = generate_spinbox_layout(
             "Sterilizer Dwell Time (s):", 0, 1000, 20.0
         )
-        dwellt_cool_lay = generate_spinbox_layout("Cooling Time (s):", 0, 1000, 5.0)
+        dwellt_cool_lay, self.dwellt_cool = generate_spinbox_layout(
+            "Cooling Time (s):", 0, 1000, 5.0
+        )
 
-        basic_setup_lay.addLayout(pdish_count_lay)
-        basic_setup_lay.addLayout(dwellt_ster_lay)
-        basic_setup_lay.addLayout(dwellt_cool_lay)
+        self.basic_setup_lay.addLayout(pdish_count_lay)
+        self.basic_setup_lay.addLayout(dwellt_ster_lay)
+        self.basic_setup_lay.addLayout(dwellt_cool_lay)
 
-        basic_setup_lay.addStretch(1)
+        self.basic_setup_lay.addStretch(1)
         layout.addWidget(basic_setup, 0, 0)
 
         # END BASIC SETUP LAYOUT
@@ -92,8 +72,10 @@ class MainWindow(QMainWindow):
         metadata_config_lay = QVBoxLayout()
         metadata_config.setLayout(metadata_config_lay)
 
-        for i in range(1, 7):
-            pdish_lay = generate_pdish_layout(i)
+        self.pdish_sel = []
+        for i in range(6):
+            pdish_lay, pdish_sel = generate_pdish_layout(i + 1)
+            self.pdish_sel.append(pdish_sel)
             metadata_config_lay.addLayout(pdish_lay)
 
         layout.addWidget(metadata_config, 0, 1)
@@ -117,15 +99,19 @@ class MainWindow(QMainWindow):
             lambda: asyncio.create_task(self.start_clicked())
         )
 
-        stop_button = QPushButton()
-        stop_button.setText("STOP")
+        self.stop_button = QPushButton()
+        self.stop_button.setText("STOP")
+        self.stop_button.setEnabled(False)
+        self.stop_button.clicked.connect(
+            lambda: asyncio.create_task(self.stop_clicked())
+        )
 
         sampling_status_lay.addWidget(progress_bar, 0, 0, 1, 4)
         sampling_status_lay.addWidget(sampling_act_label, 1, 0)
         sampling_status_lay.addWidget(sampling_act_status_msg, 1, 1)
         sampling_status_lay.setColumnStretch(1, 1)
         sampling_status_lay.addWidget(self.start_button, 1, 2)
-        sampling_status_lay.addWidget(stop_button, 1, 3)
+        sampling_status_lay.addWidget(self.stop_button, 1, 3)
 
         layout.addWidget(sampling_status, 1, 0, 1, 2)
 
@@ -135,16 +121,43 @@ class MainWindow(QMainWindow):
 
         self.setCentralWidget(widget)
 
+    def set_status_pdish_entry_fields(self, pdish_count):
+        for i in range(pdish_count):
+            self.pdish_sel[i].setEnabled(True)
+        for i in range(pdish_count, 6):
+            self.pdish_sel[i].setEnabled(False)
+
     async def start_clicked(self):
         match self.state:
             case State.IDLE | State.PAUSED:
                 self.state = State.RUNNING
+                self.stop_button.setEnabled(True)
+                # TODO Make this iterate
+                self.pdish_count.setReadOnly(True)
+                self.dwellt_ster.setReadOnly(True)
+                self.dwellt_cool.setReadOnly(True)
+                for i in self.pdish_sel:
+                    i.setReadOnly(True)
+
                 # TODO Start the thing!
+                await asyncio.sleep(2)
                 self.start_button.setText("PAUSE")
             case State.RUNNING:
                 self.state = State.PAUSED
                 # TODO Pause the thing!
+                await asyncio.sleep(1)
                 self.start_button.setText("RESUME")
+
+    async def stop_clicked(self):
+        self.state = State.IDLE
+        self.stop_button.setEnabled(False)
+        self.pdish_count.setReadOnly(False)
+        self.dwellt_ster.setReadOnly(False)
+        self.dwellt_cool.setReadOnly(False)
+        for i in self.pdish_sel:
+            i.setReadOnly(False)
+        # TODO Stop the thing!
+        self.start_button.setText("START")
 
 
 if __name__ == "__main__":
