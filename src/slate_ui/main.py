@@ -22,6 +22,7 @@ from PyQt6.QtWidgets import (
 )
 
 from generators import generate_spinbox_layout, generate_pdish_layout
+from process_control import ProcessControl
 
 
 class State(Enum):
@@ -91,13 +92,12 @@ class MainWindow(QMainWindow):
         progress_bar = QProgressBar()
 
         sampling_act_label = QLabel("Current State: ")
-        sampling_act_status_msg = QLabel("N/A")
+        self.sampling_act_status_msg = QLabel("N/A")
 
         self.start_button = QPushButton()
         self.start_button.setText("START")
-        self.start_button.clicked.connect(
-            lambda: asyncio.create_task(self.start_clicked())
-        )
+        self.start_button.clicked.connect(self.start_button_state_transition)
+        self.start_button.clicked.connect(self.spawn_process_control)
 
         self.stop_button = QPushButton()
         self.stop_button.setText("STOP")
@@ -108,7 +108,7 @@ class MainWindow(QMainWindow):
 
         sampling_status_lay.addWidget(progress_bar, 0, 0, 1, 4)
         sampling_status_lay.addWidget(sampling_act_label, 1, 0)
-        sampling_status_lay.addWidget(sampling_act_status_msg, 1, 1)
+        sampling_status_lay.addWidget(self.sampling_act_status_msg, 1, 1)
         sampling_status_lay.setColumnStretch(1, 1)
         sampling_status_lay.addWidget(self.start_button, 1, 2)
         sampling_status_lay.addWidget(self.stop_button, 1, 3)
@@ -127,10 +127,26 @@ class MainWindow(QMainWindow):
         for i in range(pdish_count, 6):
             self.pdish_sel[i].setEnabled(False)
 
-    async def start_clicked(self):
+    def start_button_state_transition(self):
         match self.state:
             case State.IDLE | State.PAUSED:
                 self.state = State.RUNNING
+            case State.RUNNING:
+                self.state = State.PAUSED
+        self.update_ui_state()
+
+    def update_ui_state(self):
+        match self.state:
+            case State.IDLE:
+                self.stop_button.setEnabled(False)
+                # TODO Make this iterate
+                self.pdish_count.setReadOnly(False)
+                self.dwellt_ster.setReadOnly(False)
+                self.dwellt_cool.setReadOnly(False)
+                for i in self.pdish_sel:
+                    i.setReadOnly(False)
+                self.start_button.setText("START")
+            case State.PAUSED:
                 self.stop_button.setEnabled(True)
                 # TODO Make this iterate
                 self.pdish_count.setReadOnly(True)
@@ -138,15 +154,28 @@ class MainWindow(QMainWindow):
                 self.dwellt_cool.setReadOnly(True)
                 for i in self.pdish_sel:
                     i.setReadOnly(True)
-
-                # TODO Start the thing!
-                await asyncio.sleep(2)
-                self.start_button.setText("PAUSE")
-            case State.RUNNING:
-                self.state = State.PAUSED
-                # TODO Pause the thing!
-                await asyncio.sleep(1)
                 self.start_button.setText("RESUME")
+            case State.RUNNING:
+                self.stop_button.setEnabled(True)
+                # TODO Make this iterate
+                self.pdish_count.setReadOnly(True)
+                self.dwellt_ster.setReadOnly(True)
+                self.dwellt_cool.setReadOnly(True)
+                for i in self.pdish_sel:
+                    i.setReadOnly(True)
+                self.start_button.setText("PAUSE")
+
+    async def spawn_process_control(self):
+        self.process_ctrl = ProcessControl(self.pdish_count.value())
+        self.process_ctrl.work_task.add_done_callback(self.handle_pc_task_completion)
+
+    def handle_pc_task_completion(self, task):
+        if task.exception():
+            self.state = State.IDLE
+            self.update_ui_state()
+            self.sampling_act_status_msg.setText(str(task.exception()))
+        else:
+            print("TODO")
 
     async def stop_clicked(self):
         self.state = State.IDLE
@@ -154,10 +183,10 @@ class MainWindow(QMainWindow):
         self.pdish_count.setReadOnly(False)
         self.dwellt_ster.setReadOnly(False)
         self.dwellt_cool.setReadOnly(False)
+        self.start_button.setText("START")
         for i in self.pdish_sel:
             i.setReadOnly(False)
-        # TODO Stop the thing!
-        self.start_button.setText("START")
+        await self.process_ctrl.terminate()
 
 
 if __name__ == "__main__":

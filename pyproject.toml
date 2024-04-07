@@ -1,0 +1,49 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "slate-ui"
+dynamic = ["version"]
+description = 'Utilitarian UI for the colony-picking robot design project'
+readme = "README.md"
+requires-python = ">=3.11"
+keywords = []
+dependencies = [
+  "PySide6>=6.6.3.1",
+  "PyQt6>=6.6.1",
+  "opencv-python>=4.9.0.80",
+  "libmotorctrl@git+https://github.com/msudesigncpr/libmotorctrl.git#egg=44e09dc6135984dec6604965af3680d0c235e2c7",
+]
+authors = [
+  { name = "William Culhane", email = "will@culhane.top" },
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: Implementation :: CPython",
+  "Programming Language :: Python :: Implementation :: PyPy",
+]
+
+[project.urls]
+Documentation = "https://github.com/msudesigncpr/slate-ui#readme"
+Issues = "https://github.com/msudesigncpr/slate-ui/issues"
+Source = "https://github.com/msudesigncpr/slate-ui"
+
+[tool.hatch.version]
+path = "src/slate_ui/__about__.py"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[[tool.hatch.envs.all.matrix]]
+python = ["3.11", "3.12"]
+
+[tool.hatch.envs.types]
+dependencies = [
+  "mypy>=1.0.0",
+]
+[tool.hatch.envs.types.scripts]
+check = "mypy --install-types --non-interactive {args:src/slate_ui tests}"
