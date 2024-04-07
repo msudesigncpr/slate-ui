@@ -67,7 +67,7 @@ class ProcessControlWorker(QObject):
         self.set_petri_dish_count(petri_dish_count)
 
     def init_system(self, petri_dish_count=4):
-        self.metadata_dir = Path("metadata") / datetime.isoformat(datetime.today())
+        self.metadata_dir = Path("metadata") / datetime.now().strftime("YYYY-MM-DDTHHMMSS")
         self.metadata_dir.mkdir(parents=True)
         logging.info("Metadata path set to %s", self.metadata_dir)
 
