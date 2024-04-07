@@ -170,9 +170,9 @@ class MainWindow(QMainWindow):
 
         self.init_thread.started.connect(self.proc_ctrl_worker.init_system)
 
-        #  self.proc_ctrl_worker.finished.connect(self.start_homing)
+        self.proc_ctrl_worker.finished.connect(self.start_homing)
         self.proc_ctrl_worker.finished.connect(self.init_thread.quit)
-        self.proc_ctrl_worker.finished.connect(self.proc_ctrl_worker.deleteLater)
+        #  self.proc_ctrl_worker.finished.connect(self.proc_ctrl_worker.deleteLater)
 
         self.proc_ctrl_worker.status_msg.connect(self.update_status_msg)
         self.proc_ctrl_worker.exception.connect(self.report_exception)
@@ -182,12 +182,8 @@ class MainWindow(QMainWindow):
 
     def start_homing(self):
         self.home_thread = QThread()
-        self.proc_ctrl_worker = ProcessControlWorker()
         self.proc_ctrl_worker.moveToThread(self.home_thread)
-
-        self.home_thread.started.connect(
-            lambda: asyncio.create_task(self.proc_ctrl_worker.home_drives)
-        )
+        self.home_thread.started.connect(self.proc_ctrl_worker.home_drives)
 
         self.proc_ctrl_worker.finished.connect(self.home_thread.quit)
         self.proc_ctrl_worker.finished.connect(self.proc_ctrl_worker.deleteLater)
@@ -195,12 +191,14 @@ class MainWindow(QMainWindow):
         self.proc_ctrl_worker.exception.connect(self.report_exception)
         self.home_thread.finished.connect(self.home_thread.deleteLater)
 
+        self.proc_ctrl_worker.status_msg.connect(self.update_status_msg)
+        self.proc_ctrl_worker.exception.connect(self.report_exception)
+        self.init_thread.finished.connect(self.init_thread.deleteLater)
+
         self.home_thread.start()
 
     def update_status_msg(self, msg):
-        print("HERE")
         self.sampling_act_status_msg.setText(msg)
-        print(f"MSG {msg}")
 
     def report_exception(self, exception):
         self.state = State.IDLE

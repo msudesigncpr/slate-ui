@@ -47,6 +47,9 @@ class ProcessControlWorker(QObject):
 
     def __init__(self, petri_dish_count, parent=None):
         QThread.__init__(self, parent)
+
+        self.main_thread = QThread.currentThread()
+
         self.petri_dishes = []
         for petri_dish in CONFIG["petri_dishes"]:
             self.petri_dishes.append(
@@ -77,6 +80,8 @@ class ProcessControlWorker(QObject):
             self.init_drives()
         except Exception as e:
             self.exception.emit(str(e))
+
+        self.moveToThread(self.main_thread)
         self.finished.emit()
 
     def set_petri_dish_count(self, petri_dish_count):
@@ -98,12 +103,16 @@ class ProcessControlWorker(QObject):
         self.raw_image_path = Path(self.metadata_dir / "raw_images")
         self.raw_image_path.mkdir()
 
-    async def home_drives(self):
-        await self.drive_ctrl.home(DriveTarget.DriveZ)
-        async with asyncio.TaskGroup() as home_tg:
-            home_tg.create_task(self.drive_ctrl.home(DriveTarget.DriveX))
-            home_tg.create_task(self.drive_ctrl.home(DriveTarget.DriveY))
-        logging.info("Homing complete")
+    def home_drives(self):
+        try:
+            self.status_msg.emit("Homing Drive Z (1/3)...")
+            asyncio.run(self.drive_ctrl.home(DriveTarget.DriveZ))
+            self.status_msg.emit("Homing Drive X (2/3)...")
+            asyncio.run(self.drive_ctrl.home(DriveTarget.DriveX))  # TODO Parallelize
+            self.status_msg.emit("Homing Drive Y (3/3)...")
+            asyncio.run(self.drive_ctrl.home(DriveTarget.DriveY))
+        except Exception as e:
+            self.exception.emit(str(e))
 
     async def calibrate(self):
         print("TODO")  # TODO
