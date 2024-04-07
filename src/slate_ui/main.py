@@ -3,7 +3,6 @@ import logging
 import sys
 from enum import Enum
 
-import PySide6.QtAsyncio as QtAsyncio
 from PyQt6.QtCore import QSize, Qt, QObject, QThread, pyqtSignal
 from PyQt6.QtWidgets import (
     QApplication,
@@ -172,6 +171,7 @@ class MainWindow(QMainWindow):
 
         self.proc_ctrl_worker.finished.connect(self.start_homing)
         self.proc_ctrl_worker.finished.connect(self.init_thread.quit)
+        self.proc_ctrl_worker.exception.connect(self.init_thread.quit)
         #  self.proc_ctrl_worker.finished.connect(self.proc_ctrl_worker.deleteLater)
 
         self.proc_ctrl_worker.status_msg.connect(self.update_status_msg)
@@ -222,4 +222,5 @@ if __name__ == "__main__":
 
     window = MainWindow()
     window.show()
-    QtAsyncio.run()
+
+    app.exec()

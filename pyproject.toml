@@ -10,10 +10,9 @@ readme = "README.md"
 requires-python = ">=3.11"
 keywords = []
 dependencies = [
-  "PySide6>=6.6.3.1",
   "PyQt6>=6.6.1",
   "opencv-python>=4.9.0.80",
-  "libmotorctrl@git+https://github.com/msudesigncpr/libmotorctrl.git#egg=44e09dc6135984dec6604965af3680d0c235e2c7",
+  "libmotorctrl@git+https://github.com/msudesigncpr/libmotorctrl.git#egg=28d9e1a6820a78b194e415b8465b7692a04628bb",
 ]
 authors = [
   { name = "William Culhane", email = "will@culhane.top" },
@@ -40,6 +39,12 @@ allow-direct-references = true
 
 [[tool.hatch.envs.all.matrix]]
 python = ["3.11", "3.12"]
+
+[tool.hatch.envs.build]
+dependencies = [
+  "pyinstaller>=6.5.0"
+]
+scripts.build-binary = "pyinstaller --onefile --collect-data libmotorctrl --add-data 'src/slate_ui/baseplate_locations.json:.' -p src/slate_ui src/slate_ui/main.py"
 
 [tool.hatch.envs.types]
 dependencies = [

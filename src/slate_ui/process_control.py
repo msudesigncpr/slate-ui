@@ -79,10 +79,11 @@ class ProcessControlWorker(QObject):
         try:
             self.init_drives()
         except Exception as e:
+            self.moveToThread(self.main_thread)
             self.exception.emit(str(e))
 
         self.moveToThread(self.main_thread)
-        self.finished.emit()
+        #  self.finished.emit()
 
     def set_petri_dish_count(self, petri_dish_count):
         self.petri_dish_count = petri_dish_count
