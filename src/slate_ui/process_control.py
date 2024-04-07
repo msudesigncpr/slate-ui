@@ -1,13 +1,16 @@
 import asyncio
-import cv2
 import json
 import logging
 import random
 import sys
 
+import cv2
+
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+
+from PyQt6.QtCore import QObject, QThread, pyqtSignal
 
 from libmotorctrl import DriveManager, DriveTarget
 
@@ -36,8 +39,14 @@ with open(Path(__file__).parent / "baseplate_locations.json", encoding="utf8") a
     CONFIG = json.load(f)
 
 
-class ProcessControl:
-    def __init__(self, petri_dish_count):
+class ProcessControlWorker(QObject):
+    finished = pyqtSignal()
+    progress = pyqtSignal(int)
+    status_msg = pyqtSignal(str)
+    exception = pyqtSignal(str)
+
+    def __init__(self, petri_dish_count, parent=None):
+        QThread.__init__(self, parent)
         self.petri_dishes = []
         for petri_dish in CONFIG["petri_dishes"]:
             self.petri_dishes.append(
@@ -54,23 +63,30 @@ class ProcessControl:
 
         self.set_petri_dish_count(petri_dish_count)
 
+    def init_system(self, petri_dish_count=4):
         self.metadata_dir = Path("metadata") / datetime.isoformat(datetime.today())
         self.metadata_dir.mkdir(parents=True)
         logging.info("Metadata path set to %s", self.metadata_dir)
 
+        self.status_msg.emit("Initializing camera...")
         self.init_camera()
         logging.info("Camera initialized")
 
-        self.work_task = asyncio.create_task(self.init_drives())
+        self.status_msg.emit("Initializing drives...")
+        try:
+            self.init_drives()
+        except Exception as e:
+            self.exception.emit(str(e))
+        self.finished.emit()
 
     def set_petri_dish_count(self, petri_dish_count):
         self.petri_dish_count = petri_dish_count
         for i in range(petri_dish_count):
             self.petri_dishes[i].is_target = True
 
-    async def init_drives(self):
+    def init_drives(self):
         self.drive_ctrl = DriveManager()
-        await self.drive_ctrl.init_drives()
+        asyncio.run(self.drive_ctrl.init_drives())
 
     def init_camera(self):
         # Configure the camera for maximum resolution, very low exposure

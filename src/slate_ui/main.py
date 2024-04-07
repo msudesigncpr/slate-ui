@@ -4,7 +4,7 @@ import sys
 from enum import Enum
 
 import PySide6.QtAsyncio as QtAsyncio
-from PyQt6.QtCore import QSize, Qt
+from PyQt6.QtCore import QSize, Qt, QObject, QThread, pyqtSignal
 from PyQt6.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -22,7 +22,7 @@ from PyQt6.QtWidgets import (
 )
 
 from generators import generate_spinbox_layout, generate_pdish_layout
-from process_control import ProcessControl
+from process_control import ProcessControlWorker
 
 
 class State(Enum):
@@ -102,9 +102,7 @@ class MainWindow(QMainWindow):
         self.stop_button = QPushButton()
         self.stop_button.setText("STOP")
         self.stop_button.setEnabled(False)
-        self.stop_button.clicked.connect(
-            lambda: asyncio.create_task(self.stop_clicked())
-        )
+        self.stop_button.clicked.connect(self.stop_clicked)
 
         sampling_status_lay.addWidget(progress_bar, 0, 0, 1, 4)
         sampling_status_lay.addWidget(sampling_act_label, 1, 0)
@@ -165,19 +163,51 @@ class MainWindow(QMainWindow):
                     i.setReadOnly(True)
                 self.start_button.setText("PAUSE")
 
-    async def spawn_process_control(self):
-        self.process_ctrl = ProcessControl(self.pdish_count.value())
-        self.process_ctrl.work_task.add_done_callback(self.handle_pc_task_completion)
+    def spawn_process_control(self):
+        self.init_thread = QThread()
+        self.proc_ctrl_worker = ProcessControlWorker(self.pdish_count.value())
+        self.proc_ctrl_worker.moveToThread(self.init_thread)
 
-    def handle_pc_task_completion(self, task):
-        if task.exception():
-            self.state = State.IDLE
-            self.update_ui_state()
-            self.sampling_act_status_msg.setText(str(task.exception()))
-        else:
-            print("TODO")
+        self.init_thread.started.connect(self.proc_ctrl_worker.init_system)
 
-    async def stop_clicked(self):
+        #  self.proc_ctrl_worker.finished.connect(self.start_homing)
+        self.proc_ctrl_worker.finished.connect(self.init_thread.quit)
+        self.proc_ctrl_worker.finished.connect(self.proc_ctrl_worker.deleteLater)
+
+        self.proc_ctrl_worker.status_msg.connect(self.update_status_msg)
+        self.proc_ctrl_worker.exception.connect(self.report_exception)
+        self.init_thread.finished.connect(self.init_thread.deleteLater)
+
+        self.init_thread.start()
+
+    def start_homing(self):
+        self.home_thread = QThread()
+        self.proc_ctrl_worker = ProcessControlWorker()
+        self.proc_ctrl_worker.moveToThread(self.home_thread)
+
+        self.home_thread.started.connect(
+            lambda: asyncio.create_task(self.proc_ctrl_worker.home_drives)
+        )
+
+        self.proc_ctrl_worker.finished.connect(self.home_thread.quit)
+        self.proc_ctrl_worker.finished.connect(self.proc_ctrl_worker.deleteLater)
+
+        self.proc_ctrl_worker.exception.connect(self.report_exception)
+        self.home_thread.finished.connect(self.home_thread.deleteLater)
+
+        self.home_thread.start()
+
+    def update_status_msg(self, msg):
+        print("HERE")
+        self.sampling_act_status_msg.setText(msg)
+        print(f"MSG {msg}")
+
+    def report_exception(self, exception):
+        self.state = State.IDLE
+        self.update_ui_state()
+        self.sampling_act_status_msg.setText(exception)
+
+    def stop_clicked(self):
         self.state = State.IDLE
         self.stop_button.setEnabled(False)
         self.pdish_count.setReadOnly(False)
@@ -186,7 +216,7 @@ class MainWindow(QMainWindow):
         self.start_button.setText("START")
         for i in self.pdish_sel:
             i.setReadOnly(False)
-        await self.process_ctrl.terminate()
+        #  await self.process_ctrl_worker.terminate()
 
 
 if __name__ == "__main__":
