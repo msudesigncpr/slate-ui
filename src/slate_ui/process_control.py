@@ -69,14 +69,14 @@ class ProcessControlWorker(QObject):
         self.output_dir = Path("output") / datetime.now().strftime("%Y%m%dT%H%M%SZ")
         self.output_dir.mkdir(parents=True)
         logging.info("Output path set to %s", self.output_dir)
-        self.logfile = Path(self.output_dir / "process.log")
+        self.logfile = Path(self.output_dir / "process.log")  # TODO Gzip this
         logging.basicConfig(
             filename=self.logfile,
             filemode="a",
             format="%(asctime)s,%(msecs)d %(levelname)s %(message)s",
             datefmt="%H:%M:%S",
             force=True,
-            level=logging.DEBUG,
+            level=logging.INFO,
         )
 
     def run_full_proc(self, petri_dish_count=4):
