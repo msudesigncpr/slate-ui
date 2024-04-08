@@ -6,7 +6,7 @@ datas += collect_data_files('libmotorctrl')
 
 
 a = Analysis(
-    ['src\\slate_ui\\main.py'],
+    ['src\\slate_ui\\slate_ui.py'],
     pathex=['src/slate_ui'],
     binaries=[],
     datas=datas,
@@ -25,7 +25,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='main',
+    name='slate_ui',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

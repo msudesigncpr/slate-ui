@@ -44,7 +44,7 @@ python = ["3.11", "3.12"]
 dependencies = [
   "pyinstaller>=6.5.0"
 ]
-scripts.build-binary = "pyinstaller --onefile --windowed --collect-data libmotorctrl --add-data src/slate_ui/baseplate_locations.json:. -p src/slate_ui src/slate_ui/main.py"
+scripts.build-binary = "pyinstaller --onefile --windowed --collect-data libmotorctrl --add-data src/slate_ui/baseplate_locations.json:. -p src/slate_ui src/slate_ui/slate_ui.py"
 
 [tool.hatch.envs.types]
 dependencies = [
