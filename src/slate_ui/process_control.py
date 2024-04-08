@@ -78,12 +78,15 @@ class ProcessControlWorker(QObject):
         self.status_msg.emit("Initializing drives...")
         try:
             self.init_drives()
+            self.home_drives()
+            self.capture_images()
+            self.terminate(polite=True)
         except Exception as e:
             self.moveToThread(self.main_thread)
             self.exception.emit(str(e))
-
-        self.moveToThread(self.main_thread)
-        #  self.finished.emit()
+        else:
+            self.moveToThread(self.main_thread)
+            self.finished.emit()
 
     def set_petri_dish_count(self, petri_dish_count):
         self.petri_dish_count = petri_dish_count
@@ -106,22 +109,31 @@ class ProcessControlWorker(QObject):
 
     def home_drives(self):
         try:
-            self.status_msg.emit("Homing Drive Z (1/3)...")
+            self.status_msg.emit("Homing drive Z [1/3]...")
             asyncio.run(self.drive_ctrl.home(DriveTarget.DriveZ))
-            self.status_msg.emit("Homing Drive X (2/3)...")
+            self.status_msg.emit("Homing drive X [2/3]...")
             asyncio.run(self.drive_ctrl.home(DriveTarget.DriveX))  # TODO Parallelize
-            self.status_msg.emit("Homing Drive Y (3/3)...")
+            self.status_msg.emit("Homing drive Y [3/3]...")
             asyncio.run(self.drive_ctrl.home(DriveTarget.DriveY))
         except Exception as e:
             self.exception.emit(str(e))
 
-    async def calibrate(self):
+    def calibrate(self):
         print("TODO")  # TODO
 
-    async def capture_images(self, petri_dish_count):
+    def capture_images(self):
         logging.info("Capturing images...")
-        for petri_dish in self.petri_dishes[:petri_dish_count]:
-            await self.drive_ctrl.move(petri_dish.x, petri_dish.y)
+        for i, petri_dish in enumerate(self.petri_dishes[: self.petri_dish_count]):
+            self.status_msg.emit(
+                f"Capturing image of Petri dish {petri_dish.id} [{i + 1}/{self.petri_dish_count}]..."
+            )
+            asyncio.run(
+                self.drive_ctrl.move_direct(
+                    int(petri_dish.x * 10**3),
+                    int(petri_dish.y * 10**3),
+                    int(50 * 10**3),
+                )
+            )
             # HACK We call `cam.read()` unnecessarily
             # It is necessary to call `cam.read()` (discarding the result), and
             # then call `cam.read()` to get the correct image.
@@ -131,8 +143,10 @@ class ProcessControlWorker(QObject):
                 logging.critical("Failed to capture Petri dish image!")
                 raise Exception("Invalid image capture result!")
 
-            petri_dish.raw_image_path = Path(self.raw_image_path / f"P{petri_dish.id}")
-            cv2.imwrite(petri_dish.raw_image_path, image)
+            petri_dish.raw_image_path = Path(
+                self.raw_image_path / f"P{petri_dish.id}.jpg"
+            )
+            cv2.imwrite(str(petri_dish.raw_image_path), image)
         self.cam.release()
 
     async def locate_valid_colonies(self):
@@ -178,8 +192,10 @@ class ProcessControlWorker(QObject):
         await self.drive_ctrl.resume()
         # TODO We need to resume last movement command
 
-    async def terminate(self):
-        await self.work_task
+    def terminate(self, polite=False):
+        self.status_msg.emit("Terminating process control...")
         self.cam.release()
-        await self.drive_ctrl.move(450_000, -90_000, 0)
-        await self.drive_ctrl.terminate()
+        if polite:
+            asyncio.run(self.drive_ctrl.move(450_000, -90_000, 0))
+        asyncio.run(self.drive_ctrl.terminate())
+        self.status_msg.emit("Process control terminated!")

@@ -169,33 +169,17 @@ class MainWindow(QMainWindow):
 
         self.init_thread.started.connect(self.proc_ctrl_worker.init_system)
 
-        self.proc_ctrl_worker.finished.connect(self.start_homing)
+        self.proc_ctrl_worker.finished.connect(self.sample_done_callback)
         self.proc_ctrl_worker.finished.connect(self.init_thread.quit)
         self.proc_ctrl_worker.exception.connect(self.init_thread.quit)
-        #  self.proc_ctrl_worker.finished.connect(self.proc_ctrl_worker.deleteLater)
+        self.proc_ctrl_worker.finished.connect(self.proc_ctrl_worker.deleteLater)
 
         self.proc_ctrl_worker.status_msg.connect(self.update_status_msg)
         self.proc_ctrl_worker.exception.connect(self.report_exception)
+
         self.init_thread.finished.connect(self.init_thread.deleteLater)
 
         self.init_thread.start()
-
-    def start_homing(self):
-        self.home_thread = QThread()
-        self.proc_ctrl_worker.moveToThread(self.home_thread)
-        self.home_thread.started.connect(self.proc_ctrl_worker.home_drives)
-
-        self.proc_ctrl_worker.finished.connect(self.home_thread.quit)
-        self.proc_ctrl_worker.finished.connect(self.proc_ctrl_worker.deleteLater)
-
-        self.proc_ctrl_worker.exception.connect(self.report_exception)
-        self.home_thread.finished.connect(self.home_thread.deleteLater)
-
-        self.proc_ctrl_worker.status_msg.connect(self.update_status_msg)
-        self.proc_ctrl_worker.exception.connect(self.report_exception)
-        self.init_thread.finished.connect(self.init_thread.deleteLater)
-
-        self.home_thread.start()
 
     def update_status_msg(self, msg):
         self.sampling_act_status_msg.setText(msg)
@@ -204,6 +188,10 @@ class MainWindow(QMainWindow):
         self.state = State.IDLE
         self.update_ui_state()
         self.sampling_act_status_msg.setText(exception)
+
+    def sample_done_callback(self):
+        self.state = State.IDLE
+        self.update_ui_state()
 
     def stop_clicked(self):
         self.state = State.IDLE
@@ -214,7 +202,9 @@ class MainWindow(QMainWindow):
         self.start_button.setText("START")
         for i in self.pdish_sel:
             i.setReadOnly(False)
-        #  await self.process_ctrl_worker.terminate()
+        self.update_status_msg("Terminating process control...")
+        self.proc_ctrl_worker.terminate(polite=False)
+        self.update_status_msg("Terminated by user!")
 
 
 if __name__ == "__main__":

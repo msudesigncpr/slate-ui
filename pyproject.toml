@@ -12,7 +12,7 @@ keywords = []
 dependencies = [
   "PyQt6>=6.6.1",
   "opencv-python>=4.9.0.80",
-  "libmotorctrl@git+https://github.com/msudesigncpr/libmotorctrl.git#egg=28d9e1a6820a78b194e415b8465b7692a04628bb",
+  "libmotorctrl@git+https://github.com/msudesigncpr/libmotorctrl.git#egg=77cb2efac4a02ec19b4dc0c8920c048b230e1cbd",
 ]
 authors = [
   { name = "William Culhane", email = "will@culhane.top" },
