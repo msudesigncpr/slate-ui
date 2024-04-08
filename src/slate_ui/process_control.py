@@ -66,10 +66,10 @@ class ProcessControlWorker(QObject):
 
         self.set_petri_dish_count(petri_dish_count)
 
-        self.metadata_dir = Path("metadata") / datetime.now().strftime("%Y%m%dT%H%M%SZ")
-        self.metadata_dir.mkdir(parents=True)
-        logging.info("Metadata path set to %s", self.metadata_dir)
-        self.logfile = Path(self.metadata_dir / "process.log")
+        self.output_dir = Path("output") / datetime.now().strftime("%Y%m%dT%H%M%SZ")
+        self.output_dir.mkdir(parents=True)
+        logging.info("Output path set to %s", self.output_dir)
+        self.logfile = Path(self.output_dir / "process.log")
         logging.basicConfig(
             filename=self.logfile,
             filemode="a",
@@ -116,7 +116,7 @@ class ProcessControlWorker(QObject):
         self.cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 2448)
         self.cam.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.05)
 
-        self.raw_image_path = Path(self.metadata_dir / "raw_images")
+        self.raw_image_path = Path(self.output_dir / "raw_images")
         self.raw_image_path.mkdir()
         logging.info("Camera initialized")
 

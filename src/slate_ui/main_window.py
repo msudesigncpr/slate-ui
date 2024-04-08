@@ -63,22 +63,22 @@ class MainWindow(QMainWindow):
 
         # END BASIC SETUP LAYOUT
 
-        # BEGIN METADATA CONFIGURATION LAYOUT
+        # BEGIN OUTPUT CONFIGURATION LAYOUT
 
-        metadata_config = QGroupBox("Metadata Configuration")
-        metadata_config_lay = QVBoxLayout()
-        metadata_config.setLayout(metadata_config_lay)
+        output_config = QGroupBox("Output Configuration")
+        output_config_lay = QVBoxLayout()
+        output_config.setLayout(output_config_lay)
 
         # Petri dish name fields
         self.pdish_sel = []
         for i in range(6):
             pdish_lay, pdish_sel = generate_pdish_layout(i + 1)
             self.pdish_sel.append(pdish_sel)
-            metadata_config_lay.addLayout(pdish_lay)
+            output_config_lay.addLayout(pdish_lay)
 
-        layout.addWidget(metadata_config, 0, 1)
+        layout.addWidget(output_config, 0, 1)
 
-        # END METADATA CONFIGURATION LAYOUT
+        # END OUTPUT CONFIGURATION LAYOUT
 
         # BEGIN SAMPLING STATUS LAYOUT
 
