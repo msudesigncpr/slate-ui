@@ -137,48 +137,35 @@ class MainWindow(QMainWindow):
                 self.state = State.PAUSED
         self.update_ui_state()
 
+    def set_config_entry(self, entry_enabled):
+        self.pdish_count.setReadOnly(not entry_enabled)
+        self.dwellt_ster.setReadOnly(not entry_enabled)
+        self.dwellt_cool.setReadOnly(not entry_enabled)
+        for i in self.pdish_sel:
+            i.setReadOnly(not entry_enabled)
+
     def update_ui_state(self):
         """Update the UI entry elements based on the state."""
         match self.state:
             case State.IDLE:
                 self.stop_button.setEnabled(False)
                 self.start_button.setEnabled(True)
-                # TODO Make this iterate
-                self.pdish_count.setReadOnly(False)
-                self.dwellt_ster.setReadOnly(False)
-                self.dwellt_cool.setReadOnly(False)
-                for i in self.pdish_sel:
-                    i.setReadOnly(False)
+                self.set_config_entry(True)
                 self.start_button.setText("START")
             case State.STARTUP:
                 self.stop_button.setEnabled(False)
                 self.start_button.setEnabled(False)
-                # TODO Make this iterate
-                self.pdish_count.setReadOnly(True)
-                self.dwellt_ster.setReadOnly(True)
-                self.dwellt_cool.setReadOnly(True)
-                for i in self.pdish_sel:
-                    i.setReadOnly(True)
+                self.set_config_entry(False)
                 self.start_button.setText("RESUME")
             case State.PAUSED:
                 self.stop_button.setEnabled(True)
                 self.start_button.setEnabled(True)
-                # TODO Make this iterate
-                self.pdish_count.setReadOnly(True)
-                self.dwellt_ster.setReadOnly(True)
-                self.dwellt_cool.setReadOnly(True)
-                for i in self.pdish_sel:
-                    i.setReadOnly(True)
+                self.set_config_entry(False)
                 self.start_button.setText("RESUME")
             case State.RUNNING:
                 self.stop_button.setEnabled(True)
                 self.start_button.setEnabled(True)
-                # TODO Make this iterate
-                self.pdish_count.setReadOnly(True)
-                self.dwellt_ster.setReadOnly(True)
-                self.dwellt_cool.setReadOnly(True)
-                for i in self.pdish_sel:
-                    i.setReadOnly(True)
+                self.set_config_entry(False)
                 self.start_button.setText("PAUSE")
 
     def spawn_process_control(self):
