@@ -46,7 +46,9 @@ class ProcessControlWorker(QObject):
     status_msg = pyqtSignal(str)  # Indicates status message displayed to user
     state = pyqtSignal(str)  # Indicates to main process where in execution flow we are
 
-    def __init__(self, petri_dish_count, parent=None):
+    def __init__(
+        self, petri_dish_count, sterilizer_dwell_duration, cooling_duration, parent=None
+    ):
         QThread.__init__(self, parent)
 
         self.main_thread = QThread.currentThread()
@@ -66,6 +68,8 @@ class ProcessControlWorker(QObject):
             )
 
         self.set_petri_dish_count(petri_dish_count)
+        self.sterilizer_dwell_duration = sterilizer_dwell_duration
+        self.cooling_duration = cooling_duration
 
         self.output_dir = Path("output") / datetime.now().strftime("%Y%m%dT%H%M%SZ")
         self.output_dir.mkdir(parents=True)
@@ -82,16 +86,19 @@ class ProcessControlWorker(QObject):
 
     def run_full_proc(self, petri_dish_count=4):
         try:
-            self.init_camera()
             self.state.emit("CAM_INIT")
-            self.init_drives()
+            self.init_camera()
             self.state.emit("DRIVE_INIT")
-            self.home_drives()
+            self.init_drives()
             self.state.emit("DRIVE_HOME")
-            self.capture_images()
+            self.home_drives()
             self.state.emit("IMG_CAP")
-            self.locate_valid_colonies()
+            self.capture_images()
             self.state.emit("IMG_PROC")
+            self.locate_valid_colonies()
+            self.state.emit("SAMP_CYC")
+            self.run_sampling_cycle()
+            self.state.emit("TERM")
             self.terminate(polite=True)
             self.state.emit("DONE")
         except Exception as e:
@@ -173,10 +180,14 @@ class ProcessControlWorker(QObject):
         self.status_msg.emit("Processing images...")
         self.csv_out_dir = Path(self.output_dir / "csv_data")
         self.csv_out_dir.mkdir()
-        baseplate_coords = find_colonies(self.raw_image_path, self.csv_out_dir) # return baseplate coords
-        # print("TODO Parse csv files")  # TODO
+        raw_baseplate_coords_dict = find_colonies(
+            self.raw_image_path, self.csv_out_dir
+        )  # TODO Clean up the data structures!
+        self.target_colony_list_ugly = []  # HACK
+        for petri_dish in raw_baseplate_coords_dict:
+            self.target_colony_list_ugly.append(raw_baseplate_coords_dict[petri_dish])
 
-
+    # TODO Integrate me!
     async def extract_target_colonies(self):
         self.status_msg.emit("Extracting target colony list...")
         total_valid_colonies = 0
@@ -206,8 +217,36 @@ class ProcessControlWorker(QObject):
                 ].is_target = True
         logging.info("Target colonies selected")
 
-    async def run_sampling_cycle(self):
-        print("TODO")  # TODO
+    def run_sampling_cycle(self):
+        self.status_msg.emit("Performing initial sterilization...")
+
+        asyncio.run(
+            self.drive_ctrl.move(
+                CONFIG["sterilizer"]["x"],
+                CONFIG["sterilizer"]["y"],
+                CONFIG["sterilizer"]["z"],
+            )
+        )
+        logging.info("Sleeping for %s seconds...", self.sterilizer_dwell_duration)
+        asyncio.sleep(self.sterilizer_dwell_duration)
+
+        asyncio.run(
+            self.drive_ctrl.move(
+                CONFIG["sterilizer"]["x"],
+                CONFIG["sterilizer"]["y"],
+                CONFIG["cruise_depth"],
+            )
+        )
+        logging.info("Sleeping for %s seconds...", self.cooling_duration)
+        asyncio.sleep(self.cooling_duration)
+
+        for i, colony in enumerate(self.target_colony_list_ugly):
+            logging.info("Sampling from colony %s...", i)
+            self.status_msg.emit(f"Sampling colony {i}")
+            asyncio.run(
+                self.drive_ctrl.move(colony[0], colony[1], 50)
+            )  # TODO Figure out z
+            # TODO Move to well
 
     async def pause(self):
         logging.info("Pausing drives...")
@@ -219,9 +258,11 @@ class ProcessControlWorker(QObject):
         # TODO We need to resume last movement command
 
     def terminate(self, polite=False):
-        self.status_msg.emit("Terminating process control...")
+        if polite:
+            self.status_msg.emit("Terminating process control...")
         self.cam.release()
         if polite:
             asyncio.run(self.drive_ctrl.move(450_000, -90_000, 0))
         asyncio.run(self.drive_ctrl.terminate())
-        self.status_msg.emit("Process control terminated!")
+        if polite:
+            self.status_msg.emit("Process control terminated!")

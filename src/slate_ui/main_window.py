@@ -171,7 +171,9 @@ class MainWindow(QMainWindow):
     def spawn_process_control(self):
         """Start the sampling process via a `ProcessControl` instance."""
         self.init_thread = QThread()
-        self.proc_ctrl_worker = ProcessControlWorker(self.pdish_count.value())
+        self.proc_ctrl_worker = ProcessControlWorker(
+            self.pdish_count.value(), self.dwellt_ster.value(), self.dwellt_cool.value()
+        )
         self.proc_ctrl_worker.moveToThread(self.init_thread)
 
         self.init_thread.started.connect(self.proc_ctrl_worker.run_full_proc)
@@ -196,7 +198,7 @@ class MainWindow(QMainWindow):
 
     def sample_state_update_callback(self, state_msg):
         """Update state based on on state message from `ProcessControl`."""
-        if state_msg == "DRIVE_INIT":
+        if state_msg == "DRIVE_HOME":
             self.state = State.RUNNING
         self.update_ui_state()
 
