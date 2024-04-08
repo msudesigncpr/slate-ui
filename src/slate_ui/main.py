@@ -26,8 +26,9 @@ from process_control import ProcessControlWorker
 
 class State(Enum):
     IDLE = 0
-    RUNNING = 1
-    PAUSED = 2
+    STARTUP = 1
+    RUNNING = 2
+    PAUSED = 3
 
 
 class MainWindow(QMainWindow):
@@ -88,7 +89,7 @@ class MainWindow(QMainWindow):
         sampling_status_lay = QGridLayout()
         sampling_status.setLayout(sampling_status_lay)
 
-        progress_bar = QProgressBar()
+        self.progress_bar = QProgressBar()
 
         sampling_act_label = QLabel("Current State:")
         self.sampling_act_status_msg = QLabel("N/A")
@@ -103,7 +104,7 @@ class MainWindow(QMainWindow):
         self.stop_button.setEnabled(False)
         self.stop_button.clicked.connect(self.stop_clicked)
 
-        sampling_status_lay.addWidget(progress_bar, 0, 0, 1, 4)
+        sampling_status_lay.addWidget(self.progress_bar, 0, 0, 1, 4)
         sampling_status_lay.addWidget(sampling_act_label, 1, 0)
         sampling_status_lay.addWidget(self.sampling_act_status_msg, 1, 1)
         sampling_status_lay.setColumnStretch(1, 1)
@@ -117,6 +118,7 @@ class MainWindow(QMainWindow):
         layout.setRowStretch(layout.rowCount(), 1)
 
         self.setCentralWidget(widget)
+        self.update_ui_state()
 
     def set_status_pdish_entry_fields(self, pdish_count):
         for i in range(pdish_count):
@@ -126,7 +128,9 @@ class MainWindow(QMainWindow):
 
     def start_button_state_transition(self):
         match self.state:
-            case State.IDLE | State.PAUSED:
+            case State.IDLE:
+                self.state = State.STARTUP
+            case State.PAUSED:
                 self.state = State.RUNNING
             case State.RUNNING:
                 self.state = State.PAUSED
@@ -136,6 +140,7 @@ class MainWindow(QMainWindow):
         match self.state:
             case State.IDLE:
                 self.stop_button.setEnabled(False)
+                self.start_button.setEnabled(True)
                 # TODO Make this iterate
                 self.pdish_count.setReadOnly(False)
                 self.dwellt_ster.setReadOnly(False)
@@ -143,8 +148,19 @@ class MainWindow(QMainWindow):
                 for i in self.pdish_sel:
                     i.setReadOnly(False)
                 self.start_button.setText("START")
+            case State.STARTUP:
+                self.stop_button.setEnabled(False)
+                self.start_button.setEnabled(False)
+                # TODO Make this iterate
+                self.pdish_count.setReadOnly(True)
+                self.dwellt_ster.setReadOnly(True)
+                self.dwellt_cool.setReadOnly(True)
+                for i in self.pdish_sel:
+                    i.setReadOnly(True)
+                self.start_button.setText("RESUME")
             case State.PAUSED:
                 self.stop_button.setEnabled(True)
+                self.start_button.setEnabled(True)
                 # TODO Make this iterate
                 self.pdish_count.setReadOnly(True)
                 self.dwellt_ster.setReadOnly(True)
@@ -154,6 +170,7 @@ class MainWindow(QMainWindow):
                 self.start_button.setText("RESUME")
             case State.RUNNING:
                 self.stop_button.setEnabled(True)
+                self.start_button.setEnabled(True)
                 # TODO Make this iterate
                 self.pdish_count.setReadOnly(True)
                 self.dwellt_ster.setReadOnly(True)
@@ -175,11 +192,16 @@ class MainWindow(QMainWindow):
         self.proc_ctrl_worker.finished.connect(self.proc_ctrl_worker.deleteLater)
 
         self.proc_ctrl_worker.status_msg.connect(self.update_status_msg)
+        self.proc_ctrl_worker.state.connect(self.sample_state_update_callback)
         self.proc_ctrl_worker.exception.connect(self.report_exception)
 
         self.init_thread.finished.connect(self.init_thread.deleteLater)
 
         self.init_thread.start()
+
+    def sample_state_update_callback(self, state_msg):
+        if state_msg == "DRIVE_INIT":
+            self.state = State.RUNNING
 
     def update_status_msg(self, msg):
         self.sampling_act_status_msg.setText(msg)

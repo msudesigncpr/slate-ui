@@ -40,11 +40,11 @@ with open(Path(__file__).parent / "baseplate_locations.json", encoding="utf8") a
 
 
 class ProcessControlWorker(QObject):
-    finished = pyqtSignal() # Indicates that thread can be terminated
-    exception = pyqtSignal(str) # Indicates something went wrong; thread terminated
-    progress = pyqtSignal(int) # Indicates progress bar value
-    status_msg = pyqtSignal(str) # Indicates status message displayed to user
-    state = pyqtSignal(str) # Indicates to main process where in execution flow we are
+    finished = pyqtSignal()  # Indicates that thread can be terminated
+    exception = pyqtSignal(str)  # Indicates something went wrong; thread terminated
+    progress = pyqtSignal(int)  # Indicates progress bar value
+    status_msg = pyqtSignal(str)  # Indicates status message displayed to user
+    state = pyqtSignal(str)  # Indicates to main process where in execution flow we are
 
     def __init__(self, petri_dish_count, parent=None):
         QThread.__init__(self, parent)
@@ -70,7 +70,6 @@ class ProcessControlWorker(QObject):
         self.metadata_dir = Path("metadata") / datetime.now().strftime("%Y%m%dT%H%M%SZ")
         self.metadata_dir.mkdir(parents=True)
         logging.info("Metadata path set to %s", self.metadata_dir)
-
 
     def run_full_proc(self, petri_dish_count=4):
         try:
@@ -126,36 +125,44 @@ class ProcessControlWorker(QObject):
 
     def capture_images(self):
         logging.info("Capturing images...")
-        for i, petri_dish in enumerate(self.petri_dishes[: self.petri_dish_count]):
-            self.status_msg.emit(
-                f"Capturing image of Petri dish {petri_dish.id} [{i + 1}/{self.petri_dish_count}]..."
-            )
-            asyncio.run(
-                self.drive_ctrl.move_direct(
-                    int((petri_dish.x + CONFIG["camera_offset"]["x"]) * 10**3),
-                    int((petri_dish.y + CONFIG["camera_offset"]["y"]) * 10**3),
-                    int(50 * 10**3),
+        image_count = 0
+        for petri_dish in self.petri_dishes:
+            if petri_dish.is_target:
+                image_count += 1
+                self.status_msg.emit(
+                    f"Capturing image of Petri dish {petri_dish.id} [{image_count}/{self.petri_dish_count}]..."
                 )
-            )
-            # HACK We call `cam.read()` unnecessarily
-            # It is necessary to call `cam.read()` (discarding the result), and
-            # then call `cam.read()` to get the correct image.
-            self.cam.read()
-            result, image = self.cam.read()
-            if not result:
-                logging.critical("Failed to capture Petri dish image!")
-                raise Exception("Invalid image capture result!")
+                asyncio.run(
+                    self.drive_ctrl.move_direct(
+                        int((petri_dish.x + CONFIG["camera_offset"]["x"]) * 10**3),
+                        int((petri_dish.y + CONFIG["camera_offset"]["y"]) * 10**3),
+                        int(50 * 10**3),
+                    )
+                )
+                if self.drive_ctrl.abort:
+                    break  # TODO Test this
+                # HACK We call `cam.read()` unnecessarily
+                # It is necessary to call `cam.read()` (discarding the result), and
+                # then call `cam.read()` to get the correct image.
+                self.cam.read()
+                result, image = self.cam.read()
+                if not result:
+                    logging.critical("Failed to capture Petri dish image!")
+                    raise Exception(
+                        f"Invalid image capture result for Petri dish {petri_dish.id}: {petri_dish.name}!"
+                    )
 
-            petri_dish.raw_image_path = Path(
-                self.raw_image_path / f"P{petri_dish.id}.jpg"
-            )
-            cv2.imwrite(str(petri_dish.raw_image_path), image)
+                petri_dish.raw_image_path = Path(
+                    self.raw_image_path / f"{petri_dish.name}.jpg"
+                )
+                cv2.imwrite(str(petri_dish.raw_image_path), image)
         self.cam.release()
 
     async def locate_valid_colonies(self):
         print("TODO")  # TODO
 
     async def extract_target_colonies(self):
+        self.status_msg.emit("Extracting target colony list...")
         total_valid_colonies = 0
         for petri_dish in self.petri_dishes:
             if petri_dish.is_target:
