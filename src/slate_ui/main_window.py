@@ -198,6 +198,7 @@ class MainWindow(QMainWindow):
         """Update state based on on state message from `ProcessControl`."""
         if state_msg == "DRIVE_INIT":
             self.state = State.RUNNING
+        self.update_ui_state()
 
     def update_status_msg(self, msg):
         """Update the displayed task label."""
