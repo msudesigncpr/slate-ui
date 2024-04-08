@@ -11,6 +11,7 @@ from pathlib import Path
 
 from PyQt6.QtCore import QObject, QThread, pyqtSignal
 
+from libcolonyfind import run_cfu
 from libmotorctrl import DriveManager, DriveTarget
 
 
@@ -89,6 +90,8 @@ class ProcessControlWorker(QObject):
             self.state.emit("DRIVE_HOME")
             self.capture_images()
             self.state.emit("IMG_CAP")
+            self.locate_valid_colonies()
+            self.state.emit("IMG_PROC")
             self.terminate(polite=True)
             self.state.emit("DONE")
         except Exception as e:
@@ -166,8 +169,16 @@ class ProcessControlWorker(QObject):
                 cv2.imwrite(str(petri_dish.raw_image_path), image)
         self.cam.release()
 
-    async def locate_valid_colonies(self):
+    def locate_valid_colonies(self):
+        self.status_msg.emit("Processing images...")
+        self.csv_out_dir = Path(self.output_dir / "csv_data")
+        self.csv_out_dir.mkdir()
+        run_cfu(images_for_cfu_win_path=self.raw_image_path,
+                images_for_cfu_wsl_path=self.raw_image_path,
+                cfu_csv_win_dump_path=self.csv_out_dir
+                )
         print("TODO")  # TODO
+
 
     async def extract_target_colonies(self):
         self.status_msg.emit("Extracting target colony list...")
