@@ -129,8 +129,8 @@ class ProcessControlWorker(QObject):
             )
             asyncio.run(
                 self.drive_ctrl.move_direct(
-                    int(petri_dish.x * 10**3),
-                    int(petri_dish.y * 10**3),
+                    int((petri_dish.x + CONFIG["camera_offset"]["x"]) * 10**3),
+                    int((petri_dish.y + CONFIG["camera_offset"]["y"]) * 10**3),
                     int(50 * 10**3),
                 )
             )

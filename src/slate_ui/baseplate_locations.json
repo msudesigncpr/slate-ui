@@ -1,4 +1,8 @@
 {
+  "camera_offset": {
+    "x": 68.21,
+    "y": 5.57
+  },
   "petri_dishes": [
     {
       "id": 4,
