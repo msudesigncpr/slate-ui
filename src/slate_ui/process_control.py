@@ -11,7 +11,7 @@ from pathlib import Path
 
 from PyQt6.QtCore import QObject, QThread, pyqtSignal
 
-from libcolonyfind import run_cfu
+from libcolonyfind import find_colonies
 from libmotorctrl import DriveManager, DriveTarget
 
 
@@ -173,11 +173,8 @@ class ProcessControlWorker(QObject):
         self.status_msg.emit("Processing images...")
         self.csv_out_dir = Path(self.output_dir / "csv_data")
         self.csv_out_dir.mkdir()
-        run_cfu(images_for_cfu_win_path=self.raw_image_path,
-                images_for_cfu_wsl_path=self.raw_image_path,
-                cfu_csv_win_dump_path=self.csv_out_dir
-                )
-        print("TODO")  # TODO
+        baseplate_coords = find_colonies(self.raw_image_path, self.csv_out_dir) # return baseplate coords
+        # print("TODO Parse csv files")  # TODO
 
 
     async def extract_target_colonies(self):
