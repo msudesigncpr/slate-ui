@@ -1,6 +1,6 @@
+import logging
 import asyncio
 import json
-import logging
 import random
 
 import cv2
@@ -69,6 +69,15 @@ class ProcessControlWorker(QObject):
         self.metadata_dir = Path("metadata") / datetime.now().strftime("%Y%m%dT%H%M%SZ")
         self.metadata_dir.mkdir(parents=True)
         logging.info("Metadata path set to %s", self.metadata_dir)
+        self.logfile = Path(self.metadata_dir / "process.log")
+        logging.basicConfig(
+            filename=self.logfile,
+            filemode="a",
+            format="%(asctime)s,%(msecs)d %(levelname)s %(message)s",
+            datefmt="%H:%M:%S",
+            force=True,
+            level=logging.DEBUG,
+        )
 
     def run_full_proc(self, petri_dish_count=4):
         try:
