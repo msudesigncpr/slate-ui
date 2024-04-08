@@ -90,7 +90,7 @@ class MainWindow(QMainWindow):
 
         progress_bar = QProgressBar()
 
-        sampling_act_label = QLabel("Current State: ")
+        sampling_act_label = QLabel("Current State:")
         self.sampling_act_status_msg = QLabel("N/A")
 
         self.start_button = QPushButton()
@@ -167,7 +167,7 @@ class MainWindow(QMainWindow):
         self.proc_ctrl_worker = ProcessControlWorker(self.pdish_count.value())
         self.proc_ctrl_worker.moveToThread(self.init_thread)
 
-        self.init_thread.started.connect(self.proc_ctrl_worker.init_system)
+        self.init_thread.started.connect(self.proc_ctrl_worker.run_full_proc)
 
         self.proc_ctrl_worker.finished.connect(self.sample_done_callback)
         self.proc_ctrl_worker.finished.connect(self.init_thread.quit)

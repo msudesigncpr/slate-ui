@@ -40,10 +40,11 @@ with open(Path(__file__).parent / "baseplate_locations.json", encoding="utf8") a
 
 
 class ProcessControlWorker(QObject):
-    finished = pyqtSignal()
-    progress = pyqtSignal(int)
-    status_msg = pyqtSignal(str)
-    exception = pyqtSignal(str)
+    finished = pyqtSignal() # Indicates that thread can be terminated
+    exception = pyqtSignal(str) # Indicates something went wrong; thread terminated
+    progress = pyqtSignal(int) # Indicates progress bar value
+    status_msg = pyqtSignal(str) # Indicates status message displayed to user
+    state = pyqtSignal(str) # Indicates to main process where in execution flow we are
 
     def __init__(self, petri_dish_count, parent=None):
         QThread.__init__(self, parent)
@@ -66,21 +67,23 @@ class ProcessControlWorker(QObject):
 
         self.set_petri_dish_count(petri_dish_count)
 
-    def init_system(self, petri_dish_count=4):
         self.metadata_dir = Path("metadata") / datetime.now().strftime("%Y%m%dT%H%M%SZ")
         self.metadata_dir.mkdir(parents=True)
         logging.info("Metadata path set to %s", self.metadata_dir)
 
-        self.status_msg.emit("Initializing camera...")
-        self.init_camera()
-        logging.info("Camera initialized")
 
-        self.status_msg.emit("Initializing drives...")
+    def run_full_proc(self, petri_dish_count=4):
         try:
+            self.init_camera()
+            self.state.emit("CAM_INIT")
             self.init_drives()
+            self.state.emit("DRIVE_INIT")
             self.home_drives()
+            self.state.emit("DRIVE_HOME")
             self.capture_images()
+            self.state.emit("IMG_CAP")
             self.terminate(polite=True)
+            self.state.emit("DONE")
         except Exception as e:
             self.moveToThread(self.main_thread)
             self.exception.emit(str(e))
@@ -94,10 +97,12 @@ class ProcessControlWorker(QObject):
             self.petri_dishes[i].is_target = True
 
     def init_drives(self):
+        self.status_msg.emit("Initializing drives...")
         self.drive_ctrl = DriveManager()
         asyncio.run(self.drive_ctrl.init_drives())
 
     def init_camera(self):
+        self.status_msg.emit("Initializing camera...")
         # Configure the camera for maximum resolution, very low exposure
         self.cam = cv2.VideoCapture(0, cv2.CAP_DSHOW)
         self.cam.set(cv2.CAP_PROP_FRAME_WIDTH, 3264)
@@ -106,6 +111,7 @@ class ProcessControlWorker(QObject):
 
         self.raw_image_path = Path(self.metadata_dir / "raw_images")
         self.raw_image_path.mkdir()
+        logging.info("Camera initialized")
 
     def home_drives(self):
         try:
@@ -117,9 +123,6 @@ class ProcessControlWorker(QObject):
             asyncio.run(self.drive_ctrl.home(DriveTarget.DriveY))
         except Exception as e:
             self.exception.emit(str(e))
-
-    def calibrate(self):
-        print("TODO")  # TODO
 
     def capture_images(self):
         logging.info("Capturing images...")
