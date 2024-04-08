@@ -222,7 +222,8 @@ class MainWindow(QMainWindow):
         self.update_ui_state()
         self.sampling_act_status_msg.setText(exception)
         self.progress_bar.setValue(0)
-        self.proc_ctrl_worker.terminate(polite=False),
+        if self.state is State.RUNNING:
+            self.proc_ctrl_worker.terminate(polite=False)
 
     def sample_done_callback(self):
         """Update state/UI for task completion."""
