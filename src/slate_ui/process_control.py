@@ -163,6 +163,8 @@ class ProcessControlWorker(QObject):
     def capture_images(self):
         logging.info("Capturing images...")
         image_count = 0
+        # TODO Raise z-axis first
+        # If we aren't already at maximum z, the needle will crash
         for petri_dish in self.petri_dishes:
             if petri_dish.is_target:
                 image_count += 1
@@ -231,28 +233,29 @@ class ProcessControlWorker(QObject):
         for petri_dish in self.petri_dishes:
             if petri_dish.is_target:
                 for colony in petri_dish.colonies:
-                    logging.info("Sampling from colony %s...", colony.id)
-                    self.colony_index.emit(colony.id)
-                    self.status_msg.emit(f"Sampling colony {colony.id + 1}...")
-                    asyncio.run(
-                        self.drive_ctrl.move(
-                            int(colony.x * 10**3),
-                            int(colony.y * 10**3),
-                            int(CONFIG_PARAMETERS["colony_depth"] * 10**3),
+                    if colony.x > 38.34:  # TODO Remove this line
+                        logging.info("Sampling from colony %s...", colony.id)
+                        self.colony_index.emit(colony.id)
+                        self.status_msg.emit(f"Sampling colony {colony.id + 1}...")
+                        asyncio.run(
+                            self.drive_ctrl.move(
+                                int(colony.x * 10**3),
+                                int(colony.y * 10**3),
+                                int(CONFIG_PARAMETERS["colony_depth"] * 10**3),
+                            )
                         )
-                    )
 
-                    self.status_msg.emit(f"Depositing colony {colony.id}...")
-                    target_well = self.wells[colony.id]
-                    logging.info("Moving to target well %s...", target_well.id)
-                    asyncio.run(
-                        self.drive_ctrl.move(
-                            int(target_well.x * 10**3),
-                            int(target_well.y * 10**3),
-                            int(CONFIG_PARAMETERS["well_depth"] * 10**3),
+                        self.status_msg.emit(f"Depositing colony {colony.id}...")
+                        target_well = self.wells[colony.id]
+                        logging.info("Moving to target well %s...", target_well.id)
+                        asyncio.run(
+                            self.drive_ctrl.move(
+                                int(target_well.x * 10**3),
+                                int(target_well.y * 10**3),
+                                int(CONFIG_PARAMETERS["well_depth"] * 10**3),
+                            )
                         )
-                    )
-                    self.sterilize_needle()
+                        self.sterilize_needle()
 
                     if self.drive_ctrl.abort:
                         break
