@@ -1,8 +1,4 @@
 {
-  "camera_offset": {
-    "x": 68.21,
-    "y": 5.57
-  },
   "petri_dishes": [
     {
       "id": 1,
@@ -46,8 +42,5 @@
       "x": 1.1,
       "y": 1.1
     }
-  ],
-  "cruise_depth": 0.00,
-  "colony_depth": 105.00,
-  "well_depth": 90.00
+  ]
 }

@@ -44,7 +44,10 @@ class Well:
 
 
 with open(Path(__file__).parent / "baseplate_locations.json", encoding="utf8") as f:
-    CONFIG = json.load(f)
+    CONFIG_LOCATIONS = json.load(f)
+
+with open(Path(__file__).parent / "runtime_parameters.json", encoding="utf8") as f:
+    CONFIG_PARAMETERS = json.load(f)
 
 
 class ProcessControlWorker(QObject):
@@ -63,7 +66,7 @@ class ProcessControlWorker(QObject):
         self.main_thread = QThread.currentThread()
 
         self.petri_dishes = []
-        for petri_dish in CONFIG["petri_dishes"]:
+        for petri_dish in CONFIG_LOCATIONS["petri_dishes"]:
             self.petri_dishes.append(
                 PetriDish(
                     id=petri_dish["id"],
@@ -77,7 +80,7 @@ class ProcessControlWorker(QObject):
             )
 
         self.wells = []
-        for well in CONFIG["wells"]:
+        for well in CONFIG_LOCATIONS["wells"]:
             self.wells.append(
                 Well(id=well["id"], x=well["x"], y=well["y"], has_sample=False)
             )
@@ -119,7 +122,7 @@ class ProcessControlWorker(QObject):
         except Exception as e:
             self.moveToThread(self.main_thread)
             self.exception.emit(str(e))
-            raise  # TODO Remove me
+            logging.error(e)
         else:
             self.moveToThread(self.main_thread)
             self.finished.emit()
@@ -168,8 +171,14 @@ class ProcessControlWorker(QObject):
                 )
                 asyncio.run(
                     self.drive_ctrl.move_direct(
-                        int((petri_dish.x + CONFIG["camera_offset"]["x"]) * 10**3),
-                        int((petri_dish.y + CONFIG["camera_offset"]["y"]) * 10**3),
+                        int(
+                            (petri_dish.x + CONFIG_PARAMETERS["camera_offset"]["x"])
+                            * 10**3
+                        ),
+                        int(
+                            (petri_dish.y + CONFIG_PARAMETERS["camera_offset"]["y"])
+                            * 10**3
+                        ),
                         int(50 * 10**3),
                     )
                 )
@@ -229,7 +238,7 @@ class ProcessControlWorker(QObject):
                         self.drive_ctrl.move(
                             int(colony.x * 10**3),
                             int(colony.y * 10**3),
-                            int(CONFIG["colony_depth"] * 10**3),
+                            int(CONFIG_PARAMETERS["colony_depth"] * 10**3),
                         )
                     )
 
@@ -240,7 +249,7 @@ class ProcessControlWorker(QObject):
                         self.drive_ctrl.move(
                             int(target_well.x * 10**3),
                             int(target_well.y * 10**3),
-                            int(CONFIG["well_depth"] * 10**3),
+                            int(CONFIG_PARAMETERS["well_depth"] * 10**3),
                         )
                     )
                     self.sterilize_needle()
@@ -255,9 +264,9 @@ class ProcessControlWorker(QObject):
 
         asyncio.run(
             self.drive_ctrl.move(
-                int(CONFIG["sterilizer"]["x"] * 10**3),
-                int(CONFIG["sterilizer"]["y"] * 10**3),
-                int(CONFIG["sterilizer"]["z"] * 10**3),
+                int(CONFIG_LOCATIONS["sterilizer"]["x"] * 10**3),
+                int(CONFIG_LOCATIONS["sterilizer"]["y"] * 10**3),
+                int(CONFIG_LOCATIONS["sterilizer"]["z"] * 10**3),
             )
         )
         logging.info("Sleeping for %s seconds...", self.sterilizer_dwell_duration)
@@ -265,9 +274,9 @@ class ProcessControlWorker(QObject):
 
         asyncio.run(
             self.drive_ctrl.move(
-                int(CONFIG["sterilizer"]["x"] * 10**3),
-                int(CONFIG["sterilizer"]["y"] * 10**3),
-                int(CONFIG["cruise_depth"] * 10**3),
+                int(CONFIG_LOCATIONS["sterilizer"]["x"] * 10**3),
+                int(CONFIG_LOCATIONS["sterilizer"]["y"] * 10**3),
+                int(CONFIG_LOCATIONS["cruise_depth"] * 10**3),
             )
         )
         logging.info("Sleeping for %s seconds...", self.cooling_duration)
