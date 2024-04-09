@@ -1,14 +1,16 @@
 # Slate UI
 
------
-
-**Table of Contents**
-
-- [Installation](#installation)
-- [License](#license)
-
-## Installation
+Run with:
 
 ```console
-pip install slate-ui
+hatch shell
+python src/slate_ui/slate_ui.py
 ```
+
+Build with:
+
+```console
+hatch run build:build-binary
+```
+
+An output binary is placed in `dist/`
