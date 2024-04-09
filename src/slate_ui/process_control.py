@@ -276,7 +276,7 @@ class ProcessControlWorker(QObject):
             self.drive_ctrl.move(
                 int(CONFIG_LOCATIONS["sterilizer"]["x"] * 10**3),
                 int(CONFIG_LOCATIONS["sterilizer"]["y"] * 10**3),
-                int(CONFIG_LOCATIONS["cruise_depth"] * 10**3),
+                int(CONFIG_PARAMETERS["cruise_depth"] * 10**3),
             )
         )
         logging.info("Sleeping for %s seconds...", self.cooling_duration)
