@@ -49,7 +49,7 @@ class MainWindow(QMainWindow):
         self.pdish_count.valueChanged.connect(self.set_status_pdish_entry_fields)
         dwellt_ster_lay, self.dwellt_ster = generate_spinbox_layout(
             "Sterilizer Dwell Time (s):", 0, 1000, 0.0
-        ) # TODO Raise default
+        )  # TODO Raise default
         dwellt_cool_lay, self.dwellt_cool = generate_spinbox_layout(
             "Cooling Time (s):", 0, 1000, 0.0
         )
@@ -208,6 +208,8 @@ class MainWindow(QMainWindow):
         """Update state based on on state message from `ProcessControl`."""
         if state_msg == "DRIVE_HOME":
             self.state = State.RUNNING
+        elif state_msg == "TERM":
+            self.progress_bar.setValue(100)
         self.update_ui_state()
 
     def update_status_msg(self, msg):
@@ -219,6 +221,7 @@ class MainWindow(QMainWindow):
         self.state = State.IDLE
         self.update_ui_state()
         self.sampling_act_status_msg.setText(exception)
+        self.progress_bar.setValue(0)
         self.proc_ctrl_worker.terminate(polite=False),
 
     def sample_done_callback(self):
@@ -237,5 +240,6 @@ class MainWindow(QMainWindow):
         for i in self.pdish_sel:
             i.setReadOnly(False)
         self.update_status_msg("Terminating process control...")
+        self.progress_bar.setValue(0)
         self.proc_ctrl_worker.terminate(polite=False)
         self.update_status_msg("Terminated by user!")

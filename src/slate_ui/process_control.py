@@ -72,9 +72,8 @@ class ProcessControlWorker(QObject):
         self.sterilizer_dwell_duration = sterilizer_dwell_duration
         self.cooling_duration = cooling_duration
 
-        #  self.output_dir = Path("output") / datetime.now().strftime("%Y%m%dT%H%M%SZ")
-        self.output_dir = Path("output") / "20240408T182259Z"
-        #  self.output_dir.mkdir(parents=True)
+        self.output_dir = Path("output") / datetime.now().strftime("%Y%m%dT%H%M%SZ")
+        self.output_dir.mkdir(parents=True)
         logging.info("Output path set to %s", self.output_dir)
         self.logfile = Path(self.output_dir / "process.log")  # TODO Gzip this
         logging.basicConfig(
@@ -95,7 +94,7 @@ class ProcessControlWorker(QObject):
             self.state.emit("DRIVE_HOME")
             #  self.home_drives()
             self.state.emit("IMG_CAP")
-            #  self.capture_images()
+            self.capture_images()
             self.state.emit("IMG_PROC")
             self.locate_valid_colonies()
             self.state.emit("SAMP_CYC")
@@ -129,8 +128,8 @@ class ProcessControlWorker(QObject):
         self.cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 2448)
         self.cam.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.05)
 
-        self.raw_image_path = Path(self.output_dir / "raw_images")
-        #  self.raw_image_path.mkdir()
+        self.raw_image_path = Path(self.output_dir / "01_raw_images")
+        self.raw_image_path.mkdir()
         logging.info("Camera initialized")
 
     def home_drives(self):
@@ -181,19 +180,24 @@ class ProcessControlWorker(QObject):
 
     def locate_valid_colonies(self):
         self.status_msg.emit("Processing images...")
-        self.csv_out_dir = Path(self.output_dir / "csv_data")
-        #  self.csv_out_dir.mkdir()
+        self.csv_out_dir = Path(self.output_dir / "02_csv_data")
+        self.annotated_image_dir = Path(self.output_dir / "03_annotated")
+        self.csv_out_dir.mkdir()
+        self.annotated_image_dir.mkdir()
         raw_baseplate_coords_dict = find_colonies(
-            self.raw_image_path, self.csv_out_dir
+            self.raw_image_path, self.csv_out_dir, self.annotated_image_dir
         )  # TODO Clean up the data structures!
         colony_counter = 0
         for petri_dish in self.petri_dishes:
-            #  print(raw_baseplate_coords_dict)
+            print(raw_baseplate_coords_dict)
             if petri_dish.name in raw_baseplate_coords_dict:
                 for colony in raw_baseplate_coords_dict[petri_dish.name]:
                     petri_dish.colonies.append(
                         Colony(
-                            id=colony_counter, x=colony[0], y=colony[1], is_target=True
+                            id=colony_counter,
+                            x=(petri_dish.x + colony[0]),
+                            y=(petri_dish.y + colony[1]),
+                            is_target=True,
                         )
                     )
                     colony_counter += 1
@@ -255,16 +259,17 @@ class ProcessControlWorker(QObject):
         for petri_dish in self.petri_dishes:
             if petri_dish.is_target:
                 for colony in petri_dish.colonies:
+                    print(f"SAM {colony}")
                     logging.info("Sampling from colony %s...", colony.id)
                     self.colony_index.emit(colony.id)
-                    self.status_msg.emit(f"Sampling colony {colony.id}...")
+                    self.status_msg.emit(f"Sampling colony {colony.id + 1}...")
                     asyncio.run(
                         self.drive_ctrl.move(
                             int(colony.x * 10**3),
                             int(colony.y * 10**3),
-                            int(50 * 10**3),
+                            int(CONFIG["colony_depth"] * 10**3),
                         )
-                    )  # TODO Figure out z
+                    )
                     # TODO Move to well
                     # TODO Move to sterilizer
                     if self.drive_ctrl.abort:

@@ -13,7 +13,7 @@ dependencies = [
   "PyQt6>=6.6.1",
   "opencv-python>=4.9.0.80",
   "libmotorctrl@git+https://github.com/msudesigncpr/libmotorctrl.git#egg=77cb2efac4a02ec19b4dc0c8920c048b230e1cbd",
-  "libcolonyfind@git+https://github.com/msudesigncpr/libcolonyfind.git#egg=b8c65590adc84d0a8ae13bed91cd4441b3a0d713",
+  "libcolonyfind@git+https://github.com/msudesigncpr/libcolonyfind.git#egg=3af26d5024114a978825aeac3fa24494d947f218",
 ]
 authors = [
   { name = "William Culhane", email = "will@culhane.top" },
