@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_data_files
 
-datas = [('src/slate_ui/baseplate_locations.json', '.')]
+datas = [('src/slate_ui/baseplate_locations.json', '.'), ('src/slate_ui/runtime_parameters.json', '.')]
 datas += collect_data_files('libmotorctrl')
 
 
