@@ -48,5 +48,6 @@
     }
   ],
   "cruise_depth": 0.00,
-  "colony_depth": 105.00
+  "colony_depth": 105.00,
+  "well_depth": 90.00
 }

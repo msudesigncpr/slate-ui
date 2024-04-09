@@ -35,6 +35,14 @@ class PetriDish:
     colonies: list[Colony] = field(default_factory=list)
 
 
+@dataclass
+class Well:
+    id: int
+    x: int
+    y: int
+    has_sample: bool
+
+
 with open(Path(__file__).parent / "baseplate_locations.json", encoding="utf8") as f:
     CONFIG = json.load(f)
 
@@ -68,6 +76,12 @@ class ProcessControlWorker(QObject):
                 )
             )
 
+        self.wells = []
+        for well in CONFIG["wells"]:
+            self.wells.append(
+                Well(id=well["id"], x=well["x"], y=well["y"], has_sample=False)
+            )
+
         self.set_petri_dish_count(petri_dish_count)
         self.sterilizer_dwell_duration = sterilizer_dwell_duration
         self.cooling_duration = cooling_duration
@@ -92,7 +106,7 @@ class ProcessControlWorker(QObject):
             self.state.emit("DRIVE_INIT")
             self.init_drives()
             self.state.emit("DRIVE_HOME")
-            #  self.home_drives()
+            self.home_drives()
             self.state.emit("IMG_CAP")
             self.capture_images()
             self.state.emit("IMG_PROC")
@@ -189,7 +203,6 @@ class ProcessControlWorker(QObject):
         )  # TODO Clean up the data structures!
         colony_counter = 0
         for petri_dish in self.petri_dishes:
-            print(raw_baseplate_coords_dict)
             if petri_dish.name in raw_baseplate_coords_dict:
                 for colony in raw_baseplate_coords_dict[petri_dish.name]:
                     petri_dish.colonies.append(
@@ -203,38 +216,42 @@ class ProcessControlWorker(QObject):
                     colony_counter += 1
         self.colony_count.emit(colony_counter)
 
-    # TODO Integrate me!
-    async def extract_target_colonies(self):
-        self.status_msg.emit("Extracting target colony list...")
-        total_valid_colonies = 0
+    def run_sampling_cycle(self):
+        self.sterilize_needle()
+
         for petri_dish in self.petri_dishes:
             if petri_dish.is_target:
-                total_valid_colonies += len(petri_dish.colonies)
-
-        if total_valid_colonies <= 96:
-            for petri_dish in self.petri_dishes:
                 for colony in petri_dish.colonies:
-                    colony.is_target = True
-        else:
-            for i in range(96):
-                start_c = True  # HACK
-                dish_colonies_valid = []
-                while start_c or len(dish_colonies_valid) == 0:
-                    start_c = False
-                    target_petri_dish = random.randrange(self.petri_dish_count)
-                    dish_colonies_all = self.petri_dishes[target_petri_dish].colonies
-                    dish_colonies_valid = [
-                        colony for colony in dish_colonies_all if not colony.is_target
-                    ]
+                    logging.info("Sampling from colony %s...", colony.id)
+                    self.colony_index.emit(colony.id)
+                    self.status_msg.emit(f"Sampling colony {colony.id + 1}...")
+                    asyncio.run(
+                        self.drive_ctrl.move(
+                            int(colony.x * 10**3),
+                            int(colony.y * 10**3),
+                            int(CONFIG["colony_depth"] * 10**3),
+                        )
+                    )
 
-                target_colony = random.randrange(len(dish_colonies_valid))
-                self.petri_dishes[target_petri_dish].colonies[
-                    target_colony
-                ].is_target = True
-        logging.info("Target colonies selected")
+                    self.status_msg.emit(f"Depositing colony {colony.id}...")
+                    target_well = self.wells[colony.id]
+                    logging.info("Moving to target well %s...", target_well.id)
+                    asyncio.run(
+                        self.drive_ctrl.move(
+                            int(target_well.x * 10**3),
+                            int(target_well.y * 10**3),
+                            int(CONFIG["well_depth"] * 10**3),
+                        )
+                    )
+                    self.sterilize_needle()
 
-    def run_sampling_cycle(self):
-        self.status_msg.emit("Performing initial sterilization...")
+                    if self.drive_ctrl.abort:
+                        break
+            if self.drive_ctrl.abort:
+                break
+
+    def sterilize_needle(self):
+        self.status_msg.emit("Sterilizing needle...")
 
         asyncio.run(
             self.drive_ctrl.move(
@@ -255,27 +272,6 @@ class ProcessControlWorker(QObject):
         )
         logging.info("Sleeping for %s seconds...", self.cooling_duration)
         time.sleep(self.cooling_duration)
-
-        for petri_dish in self.petri_dishes:
-            if petri_dish.is_target:
-                for colony in petri_dish.colonies:
-                    print(f"SAM {colony}")
-                    logging.info("Sampling from colony %s...", colony.id)
-                    self.colony_index.emit(colony.id)
-                    self.status_msg.emit(f"Sampling colony {colony.id + 1}...")
-                    asyncio.run(
-                        self.drive_ctrl.move(
-                            int(colony.x * 10**3),
-                            int(colony.y * 10**3),
-                            int(CONFIG["colony_depth"] * 10**3),
-                        )
-                    )
-                    # TODO Move to well
-                    # TODO Move to sterilizer
-                    if self.drive_ctrl.abort:
-                        break
-            if self.drive_ctrl.abort:
-                break
 
     async def pause(self):
         logging.info("Pausing drives...")

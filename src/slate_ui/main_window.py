@@ -48,10 +48,10 @@ class MainWindow(QMainWindow):
         )
         self.pdish_count.valueChanged.connect(self.set_status_pdish_entry_fields)
         dwellt_ster_lay, self.dwellt_ster = generate_spinbox_layout(
-            "Sterilizer Dwell Time (s):", 0, 1000, 0.0
+            "Sterilizer Dwell Time (s):", 0, 1000, 20.0
         )  # TODO Raise default
         dwellt_cool_lay, self.dwellt_cool = generate_spinbox_layout(
-            "Cooling Time (s):", 0, 1000, 0.0
+            "Cooling Time (s):", 0, 1000, 5.0
         )
 
         self.basic_setup_lay.addLayout(pdish_count_lay)
