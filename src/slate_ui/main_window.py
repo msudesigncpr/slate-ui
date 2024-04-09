@@ -48,10 +48,10 @@ class MainWindow(QMainWindow):
         )
         self.pdish_count.valueChanged.connect(self.set_status_pdish_entry_fields)
         dwellt_ster_lay, self.dwellt_ster = generate_spinbox_layout(
-            "Sterilizer Dwell Time (s):", 0, 1000, 20.0
-        )
+            "Sterilizer Dwell Time (s):", 0, 1000, 0.0
+        ) # TODO Raise default
         dwellt_cool_lay, self.dwellt_cool = generate_spinbox_layout(
-            "Cooling Time (s):", 0, 1000, 5.0
+            "Cooling Time (s):", 0, 1000, 0.0
         )
 
         self.basic_setup_lay.addLayout(pdish_count_lay)
@@ -190,11 +190,19 @@ class MainWindow(QMainWindow):
         # Status/state update callbacks
         self.proc_ctrl_worker.status_msg.connect(self.update_status_msg)
         self.proc_ctrl_worker.state.connect(self.sample_state_update_callback)
+        self.proc_ctrl_worker.colony_count.connect(self.update_progress_max)
+        self.proc_ctrl_worker.colony_index.connect(self.update_progress)
 
         # Thread cleanup
         self.init_thread.finished.connect(self.init_thread.deleteLater)
 
         self.init_thread.start()
+
+    def update_progress_max(self, new_max):
+        self.progress_bar.setMaximum(new_max)
+
+    def update_progress(self, new_progress):
+        self.progress_bar.setValue(new_progress)
 
     def sample_state_update_callback(self, state_msg):
         """Update state based on on state message from `ProcessControl`."""

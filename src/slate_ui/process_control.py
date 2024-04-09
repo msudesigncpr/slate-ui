@@ -42,7 +42,8 @@ with open(Path(__file__).parent / "baseplate_locations.json", encoding="utf8") a
 class ProcessControlWorker(QObject):
     finished = pyqtSignal()  # Indicates that thread can be terminated
     exception = pyqtSignal(str)  # Indicates something went wrong; thread terminated
-    progress = pyqtSignal(int)  # Indicates progress bar value
+    colony_count = pyqtSignal(int)  # Indicates maximum progress bar value
+    colony_index = pyqtSignal(int)  # Indicates progress bar value
     status_msg = pyqtSignal(str)  # Indicates status message displayed to user
     state = pyqtSignal(str)  # Indicates to main process where in execution flow we are
 
@@ -196,6 +197,7 @@ class ProcessControlWorker(QObject):
                         )
                     )
                     colony_counter += 1
+        self.colony_count.emit(colony_counter)
 
     # TODO Integrate me!
     async def extract_target_colonies(self):
@@ -254,7 +256,8 @@ class ProcessControlWorker(QObject):
             if petri_dish.is_target:
                 for colony in petri_dish.colonies:
                     logging.info("Sampling from colony %s...", colony.id)
-                    self.status_msg.emit(f"Sampling colony {colony.id}")
+                    self.colony_index.emit(colony.id)
+                    self.status_msg.emit(f"Sampling colony {colony.id}...")
                     asyncio.run(
                         self.drive_ctrl.move(
                             int(colony.x * 10**3),
