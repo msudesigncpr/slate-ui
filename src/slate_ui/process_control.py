@@ -2,10 +2,11 @@ import logging
 import asyncio
 import json
 import random
+import time
 
 import cv2
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
@@ -18,7 +19,6 @@ from libmotorctrl import DriveManager, DriveTarget
 @dataclass
 class Colony:
     id: int
-    dish: int
     x: float
     y: float
     is_target: bool
@@ -32,7 +32,7 @@ class PetriDish:
     y: int
     is_target: bool
     raw_image: str
-    colonies: list
+    colonies: list[Colony] = field(default_factory=list)
 
 
 with open(Path(__file__).parent / "baseplate_locations.json", encoding="utf8") as f:
@@ -71,8 +71,9 @@ class ProcessControlWorker(QObject):
         self.sterilizer_dwell_duration = sterilizer_dwell_duration
         self.cooling_duration = cooling_duration
 
-        self.output_dir = Path("output") / datetime.now().strftime("%Y%m%dT%H%M%SZ")
-        self.output_dir.mkdir(parents=True)
+        #  self.output_dir = Path("output") / datetime.now().strftime("%Y%m%dT%H%M%SZ")
+        self.output_dir = Path("output") / "20240408T182259Z"
+        #  self.output_dir.mkdir(parents=True)
         logging.info("Output path set to %s", self.output_dir)
         self.logfile = Path(self.output_dir / "process.log")  # TODO Gzip this
         logging.basicConfig(
@@ -91,9 +92,9 @@ class ProcessControlWorker(QObject):
             self.state.emit("DRIVE_INIT")
             self.init_drives()
             self.state.emit("DRIVE_HOME")
-            self.home_drives()
+            #  self.home_drives()
             self.state.emit("IMG_CAP")
-            self.capture_images()
+            #  self.capture_images()
             self.state.emit("IMG_PROC")
             self.locate_valid_colonies()
             self.state.emit("SAMP_CYC")
@@ -104,6 +105,7 @@ class ProcessControlWorker(QObject):
         except Exception as e:
             self.moveToThread(self.main_thread)
             self.exception.emit(str(e))
+            raise  # TODO Remove me
         else:
             self.moveToThread(self.main_thread)
             self.finished.emit()
@@ -127,7 +129,7 @@ class ProcessControlWorker(QObject):
         self.cam.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.05)
 
         self.raw_image_path = Path(self.output_dir / "raw_images")
-        self.raw_image_path.mkdir()
+        #  self.raw_image_path.mkdir()
         logging.info("Camera initialized")
 
     def home_drives(self):
@@ -179,13 +181,21 @@ class ProcessControlWorker(QObject):
     def locate_valid_colonies(self):
         self.status_msg.emit("Processing images...")
         self.csv_out_dir = Path(self.output_dir / "csv_data")
-        self.csv_out_dir.mkdir()
+        #  self.csv_out_dir.mkdir()
         raw_baseplate_coords_dict = find_colonies(
             self.raw_image_path, self.csv_out_dir
         )  # TODO Clean up the data structures!
-        self.target_colony_list_ugly = []  # HACK
-        for petri_dish in raw_baseplate_coords_dict:
-            self.target_colony_list_ugly.append(raw_baseplate_coords_dict[petri_dish])
+        colony_counter = 0
+        for petri_dish in self.petri_dishes:
+            #  print(raw_baseplate_coords_dict)
+            if petri_dish.name in raw_baseplate_coords_dict:
+                for colony in raw_baseplate_coords_dict[petri_dish.name]:
+                    petri_dish.colonies.append(
+                        Colony(
+                            id=colony_counter, x=colony[0], y=colony[1], is_target=True
+                        )
+                    )
+                    colony_counter += 1
 
     # TODO Integrate me!
     async def extract_target_colonies(self):
@@ -222,31 +232,42 @@ class ProcessControlWorker(QObject):
 
         asyncio.run(
             self.drive_ctrl.move(
-                CONFIG["sterilizer"]["x"],
-                CONFIG["sterilizer"]["y"],
-                CONFIG["sterilizer"]["z"],
+                int(CONFIG["sterilizer"]["x"] * 10**3),
+                int(CONFIG["sterilizer"]["y"] * 10**3),
+                int(CONFIG["sterilizer"]["z"] * 10**3),
             )
         )
         logging.info("Sleeping for %s seconds...", self.sterilizer_dwell_duration)
-        asyncio.sleep(self.sterilizer_dwell_duration)
+        time.sleep(self.sterilizer_dwell_duration)
 
         asyncio.run(
             self.drive_ctrl.move(
-                CONFIG["sterilizer"]["x"],
-                CONFIG["sterilizer"]["y"],
-                CONFIG["cruise_depth"],
+                int(CONFIG["sterilizer"]["x"] * 10**3),
+                int(CONFIG["sterilizer"]["y"] * 10**3),
+                int(CONFIG["cruise_depth"] * 10**3),
             )
         )
         logging.info("Sleeping for %s seconds...", self.cooling_duration)
-        asyncio.sleep(self.cooling_duration)
+        time.sleep(self.cooling_duration)
 
-        for i, colony in enumerate(self.target_colony_list_ugly):
-            logging.info("Sampling from colony %s...", i)
-            self.status_msg.emit(f"Sampling colony {i}")
-            asyncio.run(
-                self.drive_ctrl.move(colony[0], colony[1], 50)
-            )  # TODO Figure out z
-            # TODO Move to well
+        for petri_dish in self.petri_dishes:
+            if petri_dish.is_target:
+                for colony in petri_dish.colonies:
+                    logging.info("Sampling from colony %s...", colony.id)
+                    self.status_msg.emit(f"Sampling colony {colony.id}")
+                    asyncio.run(
+                        self.drive_ctrl.move(
+                            int(colony.x * 10**3),
+                            int(colony.y * 10**3),
+                            int(50 * 10**3),
+                        )
+                    )  # TODO Figure out z
+                    # TODO Move to well
+                    # TODO Move to sterilizer
+                    if self.drive_ctrl.abort:
+                        break
+            if self.drive_ctrl.abort:
+                break
 
     async def pause(self):
         logging.info("Pausing drives...")
