@@ -1,13 +1,14 @@
 import logging
 import asyncio
 import json
-import random
 import time
 
 import cv2
+import openpyxl
+from openpyxl.drawing.image import Image as ExcelImage
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from PyQt6.QtCore import QObject, QThread, pyqtSignal
@@ -17,11 +18,21 @@ from libmotorctrl import DriveManager, DriveTarget
 
 
 @dataclass
+class Well:
+    id: int
+    x: int
+    y: int
+    has_sample: bool
+
+
+@dataclass
 class Colony:
     id: int
     x: float
     y: float
     is_target: bool
+    sample_duration: datetime.timedelta
+    well: Well
 
 
 @dataclass
@@ -33,14 +44,6 @@ class PetriDish:
     is_target: bool
     raw_image: str
     colonies: list[Colony] = field(default_factory=list)
-
-
-@dataclass
-class Well:
-    id: int
-    x: int
-    y: int
-    has_sample: bool
 
 
 with open(Path(__file__).parent / "baseplate_locations.json", encoding="utf8") as f:
@@ -116,6 +119,8 @@ class ProcessControlWorker(QObject):
             self.locate_valid_colonies()
             self.state.emit("SAMP_CYC")
             self.run_sampling_cycle()
+            self.state.emit("SAV_TAB")
+            self.save_tabulated_data()
             self.state.emit("TERM")
             self.terminate(polite=True)
             self.state.emit("DONE")
@@ -222,6 +227,8 @@ class ProcessControlWorker(QObject):
                             x=(petri_dish.x + colony[0]),
                             y=(petri_dish.y + colony[1]),
                             is_target=True,
+                            sample_duration=None,
+                            well=None,
                         )
                     )
                     colony_counter += 1
@@ -235,6 +242,7 @@ class ProcessControlWorker(QObject):
                 for colony in petri_dish.colonies:
                     if colony.x > 38.34:  # TODO Remove this line
                         logging.info("Sampling from colony %s...", colony.id)
+                        start_time = datetime.now()
                         self.colony_index.emit(colony.id)
                         self.status_msg.emit(f"Sampling colony {colony.id + 1}...")
                         asyncio.run(
@@ -247,6 +255,7 @@ class ProcessControlWorker(QObject):
 
                         self.status_msg.emit(f"Depositing colony {colony.id}...")
                         target_well = self.wells[colony.id]
+                        colony.well = target_well["id"]
                         logging.info("Moving to target well %s...", target_well.id)
                         asyncio.run(
                             self.drive_ctrl.move(
@@ -256,6 +265,7 @@ class ProcessControlWorker(QObject):
                             )
                         )
                         self.sterilize_needle()
+                        colony.sample_duration = datetime.now() - start_time
 
                     if self.drive_ctrl.abort:
                         break
@@ -293,6 +303,26 @@ class ProcessControlWorker(QObject):
         logging.info("Resuming drives...")
         await self.drive_ctrl.resume()
         # TODO We need to resume last movement command
+
+    def save_tabulated_data(self):
+        self.tab_data_dir = Path(self.output_dir / "04_tabulated_data")
+        self.tab_data_dir.mkdir()
+        workbook = openpyxl.Workbook()
+        for petri_dish in self.petri_dishes:
+            if petri_dish.is_target:
+                active_worksheet = workbook.create_sheet(petri_dish.name)
+                active_worksheet.append(
+                    ["Well", "Origin X", "Origin Y", "Cycle Duration (s)"]
+                )
+                for row_num, colony in enumerate(petri_dish.colonies):
+                    active_worksheet.append(
+                        colony.well.id,
+                        colony.x,
+                        colony.y,
+                        colony.sample_duration.total_seconds(),
+                    )
+                    img = ExcelImage(self.annotated_image_dir)
+                    active_worksheet.add_image(img, f"F{row_num + 2}")
 
     def terminate(self, polite=False):
         if polite:
