@@ -1,9 +1,9 @@
 {
   "camera_offset": {
-    "x": 68.21,
-    "y": 5.57
+    "x": 66.23,
+    "y": 5.53
   },
   "cruise_depth": 0.00,
-  "colony_depth": 105.00,
+  "colony_depth": 110.00,
   "well_depth": 90.00
 }
