@@ -246,5 +246,5 @@ class MainWindow(QMainWindow):
             i.setReadOnly(False)
         self.update_status_msg("Terminating process control...")
         self.proc_ctrl_worker.terminate(polite=False)
-        self.progress_bar.reset(0)
+        self.progress_bar.reset()
         self.update_status_msg("Terminated by user!")
