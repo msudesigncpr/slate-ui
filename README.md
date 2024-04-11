@@ -1,5 +1,7 @@
 # Slate UI
 
+![](/bin/screenshot.png)
+
 Run with:
 
 ```console
