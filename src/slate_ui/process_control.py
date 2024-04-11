@@ -295,16 +295,16 @@ class ProcessControlWorker(QObject):
         logging.info("Sleeping for %s seconds...", self.cooling_duration)
         time.sleep(self.cooling_duration)
 
-    async def pause(self):
+    def pause(self):
         logging.info("Pausing drives...")
-        await self.drive_ctrl.stop()
+        asyncio.run(self.drive_ctrl.stop())
 
-    async def resume(self):
+    def resume(self):
         logging.info("Resuming drives...")
-        await self.drive_ctrl.resume()
-        # TODO We need to resume last movement command
+        asyncio.run(self.drive_ctrl.resume())
 
     def save_tabulated_data(self):
+        self.status_msg.emit("Saving run data...")
         self.tab_data_dir = Path(self.output_dir / "04_tabulated_data")
         self.tab_data_dir.mkdir()
         workbook = openpyxl.Workbook()

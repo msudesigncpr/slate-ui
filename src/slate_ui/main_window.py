@@ -170,33 +170,43 @@ class MainWindow(QMainWindow):
 
     def spawn_process_control(self):
         """Start the sampling process via a `ProcessControl` instance."""
-        self.init_thread = QThread()
-        self.proc_ctrl_worker = ProcessControlWorker(
-            self.pdish_count.value(), self.dwellt_ster.value(), self.dwellt_cool.value()
-        )
-        self.proc_ctrl_worker.moveToThread(self.init_thread)
+        match self.state:
+            case State.IDLE:
+                self.init_thread = QThread()
+                self.proc_ctrl_worker = ProcessControlWorker(
+                    self.pdish_count.value(),
+                    self.dwellt_ster.value(),
+                    self.dwellt_cool.value(),
+                )
+                self.proc_ctrl_worker.moveToThread(self.init_thread)
 
-        self.init_thread.started.connect(self.proc_ctrl_worker.run_full_proc)
+                self.init_thread.started.connect(self.proc_ctrl_worker.run_full_proc)
 
-        # Task completed callbacks
-        self.proc_ctrl_worker.finished.connect(self.sample_done_callback)
-        self.proc_ctrl_worker.finished.connect(self.init_thread.quit)
-        self.proc_ctrl_worker.finished.connect(self.proc_ctrl_worker.deleteLater)
+                # Task completed callbacks
+                self.proc_ctrl_worker.finished.connect(self.sample_done_callback)
+                self.proc_ctrl_worker.finished.connect(self.init_thread.quit)
+                self.proc_ctrl_worker.finished.connect(
+                    self.proc_ctrl_worker.deleteLater
+                )
 
-        # Task error callbacks
-        self.proc_ctrl_worker.exception.connect(self.report_exception)
-        self.proc_ctrl_worker.exception.connect(self.init_thread.quit)
+                # Task error callbacks
+                self.proc_ctrl_worker.exception.connect(self.report_exception)
+                self.proc_ctrl_worker.exception.connect(self.init_thread.quit)
 
-        # Status/state update callbacks
-        self.proc_ctrl_worker.status_msg.connect(self.update_status_msg)
-        self.proc_ctrl_worker.state.connect(self.sample_state_update_callback)
-        self.proc_ctrl_worker.colony_count.connect(self.update_progress_max)
-        self.proc_ctrl_worker.colony_index.connect(self.update_progress)
+                # Status/state update callbacks
+                self.proc_ctrl_worker.status_msg.connect(self.update_status_msg)
+                self.proc_ctrl_worker.state.connect(self.sample_state_update_callback)
+                self.proc_ctrl_worker.colony_count.connect(self.update_progress_max)
+                self.proc_ctrl_worker.colony_index.connect(self.update_progress)
 
-        # Thread cleanup
-        self.init_thread.finished.connect(self.init_thread.deleteLater)
+                # Thread cleanup
+                self.init_thread.finished.connect(self.init_thread.deleteLater)
 
-        self.init_thread.start()
+                self.init_thread.start()
+            case State.RUNNING:
+                self.proc_ctrl_worker.pause()
+            case State.PAUSED:
+                self.proc_ctrl_worker.resume()
 
     def update_progress_max(self, new_max):
         self.progress_bar.setMaximum(new_max)
