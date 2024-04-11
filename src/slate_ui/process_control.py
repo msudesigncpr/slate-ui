@@ -1,6 +1,7 @@
 import logging
 import asyncio
 import json
+import os
 import time
 
 import cv2
@@ -19,7 +20,7 @@ from libmotorctrl import DriveManager, DriveTarget
 
 @dataclass
 class Well:
-    id: int
+    id: str
     x: int
     y: int
     has_sample: bool
@@ -31,8 +32,8 @@ class Colony:
     x: float
     y: float
     is_target: bool
-    sample_duration: datetime.timedelta
-    well: Well
+    sample_duration: timedelta
+    well: str
 
 
 @dataclass
@@ -42,7 +43,8 @@ class PetriDish:
     x: int
     y: int
     is_target: bool
-    raw_image: str
+    raw_image_path: str
+    annotated_image_path: str
     colonies: list[Colony] = field(default_factory=list)
 
 
@@ -65,8 +67,9 @@ class ProcessControlWorker(QObject):
         self, petri_dish_count, sterilizer_dwell_duration, cooling_duration, parent=None
     ):
         QThread.__init__(self, parent)
-
         self.main_thread = QThread.currentThread()
+
+        self.paused = False
 
         self.petri_dishes = []
         for petri_dish in CONFIG_LOCATIONS["petri_dishes"]:
@@ -77,7 +80,8 @@ class ProcessControlWorker(QObject):
                     x=petri_dish["x"],
                     y=petri_dish["y"],
                     is_target=False,
-                    raw_image="",
+                    raw_image_path="",
+                    annotated_image_path="",
                     colonies=[],
                 )
             )
@@ -92,10 +96,11 @@ class ProcessControlWorker(QObject):
         self.sterilizer_dwell_duration = sterilizer_dwell_duration
         self.cooling_duration = cooling_duration
 
-        self.output_dir = Path("output") / datetime.now().strftime("%Y%m%dT%H%M%SZ")
+        self.run_id = datetime.now().strftime("%Y%m%dT%H%M%SZ")
+        self.output_dir = Path("output") / self.run_id
         self.output_dir.mkdir(parents=True)
         logging.info("Output path set to %s", self.output_dir)
-        self.logfile = Path(self.output_dir / "process.log")  # TODO Gzip this
+        self.logfile = self.output_dir / "process.log"  # TODO Gzip this
         logging.basicConfig(
             filename=self.logfile,
             filemode="a",
@@ -150,7 +155,7 @@ class ProcessControlWorker(QObject):
         self.cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 2448)
         self.cam.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.05)
 
-        self.raw_image_path = Path(self.output_dir / "01_raw_images")
+        self.raw_image_path = self.output_dir / "01_raw_images"
         self.raw_image_path.mkdir()
         logging.info("Camera initialized")
 
@@ -210,20 +215,24 @@ class ProcessControlWorker(QObject):
 
     def locate_valid_colonies(self):
         self.status_msg.emit("Processing images...")
-        self.csv_out_dir = Path(self.output_dir / "02_csv_data")
-        self.annotated_image_dir = Path(self.output_dir / "03_annotated")
+        self.csv_out_dir = self.output_dir / "02_csv_data"
+        self.annotated_image_dir = self.output_dir / "03_annotated"
         self.csv_out_dir.mkdir()
         self.annotated_image_dir.mkdir()
         raw_baseplate_coords_dict = find_colonies(
             self.raw_image_path, self.csv_out_dir, self.annotated_image_dir
         )  # TODO Clean up the data structures!
-        colony_counter = 0
+        for petri_dish in self.petri_dishes:
+            annotated_path = self.annotated_image_dir / f"{petri_dish.name}.jpg"
+            if os.path.isfile(annotated_path):
+                petri_dish.annotated_image_path = annotated_path
+        colony_count = 0
         for petri_dish in self.petri_dishes:
             if petri_dish.name in raw_baseplate_coords_dict:
                 for colony in raw_baseplate_coords_dict[petri_dish.name]:
                     petri_dish.colonies.append(
                         Colony(
-                            id=colony_counter,
+                            id=colony_count,
                             x=(petri_dish.x + colony[0]),
                             y=(petri_dish.y + colony[1]),
                             is_target=True,
@@ -231,8 +240,9 @@ class ProcessControlWorker(QObject):
                             well=None,
                         )
                     )
-                    colony_counter += 1
-        self.colony_count.emit(colony_counter)
+                    colony_count += 1
+        self.total_colonies = colony_count
+        self.colony_count.emit(self.total_colonies)
 
     def run_sampling_cycle(self):
         self.sterilize_needle()
@@ -253,9 +263,9 @@ class ProcessControlWorker(QObject):
                             )
                         )
 
-                        self.status_msg.emit(f"Depositing colony {colony.id}...")
+                        self.status_msg.emit(f"Depositing colony {colony.id + 1}...")
                         target_well = self.wells[colony.id]
-                        colony.well = target_well["id"]
+                        colony.well = target_well.id
                         logging.info("Moving to target well %s...", target_well.id)
                         asyncio.run(
                             self.drive_ctrl.move(
@@ -297,35 +307,44 @@ class ProcessControlWorker(QObject):
 
     def pause(self):
         logging.info("Pausing drives...")
+        self.paused = True
         asyncio.run(self.drive_ctrl.stop())
 
     def resume(self):
         logging.info("Resuming drives...")
+        self.paused = False
         asyncio.run(self.drive_ctrl.resume())
 
     def save_tabulated_data(self):
         self.status_msg.emit("Saving run data...")
-        self.tab_data_dir = Path(self.output_dir / "04_tabulated_data")
-        self.tab_data_dir.mkdir()
         workbook = openpyxl.Workbook()
         for petri_dish in self.petri_dishes:
             if petri_dish.is_target:
-                active_worksheet = workbook.create_sheet(petri_dish.name)
+                if petri_dish.id == 1:
+                    active_worksheet = workbook.active
+                else:
+                    active_worksheet = workbook.create_sheet(petri_dish.name)
                 active_worksheet.append(
                     ["Well", "Origin X", "Origin Y", "Cycle Duration (s)"]
                 )
                 for row_num, colony in enumerate(petri_dish.colonies):
                     active_worksheet.append(
-                        colony.well.id,
-                        colony.x,
-                        colony.y,
-                        colony.sample_duration.total_seconds(),
+                        [
+                            colony.well,
+                            colony.x,
+                            colony.y,
+                            colony.sample_duration.total_seconds(),
+                        ]
                     )
-                    img = ExcelImage(self.annotated_image_dir)
+                    img = ExcelImage(
+                        petri_dish.raw_image_path
+                    )  # TODO Crop before insert
                     active_worksheet.add_image(img, f"F{row_num + 2}")
+        workbook.save(self.output_dir / f"run-data-{self.run_id}.xlsx")
 
     def terminate(self, polite=False):
         if polite:
+            self.colony_index.emit(self.total_colonies)
             self.status_msg.emit("Terminating process control...")
         self.cam.release()
         if polite:

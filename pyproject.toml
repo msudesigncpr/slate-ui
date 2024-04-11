@@ -12,7 +12,9 @@ keywords = []
 dependencies = [
   "PyQt6>=6.6.1",
   "opencv-python>=4.9.0.80",
-  "libmotorctrl@git+https://github.com/msudesigncpr/libmotorctrl.git#egg=77cb2efac4a02ec19b4dc0c8920c048b230e1cbd",
+  "openpyxl>=3.1.2",
+  "pillow>=10.3.0",
+  "libmotorctrl@git+https://github.com/msudesigncpr/libmotorctrl.git#egg=ee15bbe567514d9476b9a814d355c2400d68a060",
   "libcolonyfind@git+https://github.com/msudesigncpr/libcolonyfind.git#egg=ee15bbe567514d9476b9a814d355c2400d68a060",
 ]
 authors = [

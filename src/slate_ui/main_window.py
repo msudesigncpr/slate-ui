@@ -94,14 +94,13 @@ class MainWindow(QMainWindow):
         # Start/pause button
         self.start_button = QPushButton()
         self.start_button.setText("START")
-        self.start_button.clicked.connect(self.start_button_state_transition)
-        self.start_button.clicked.connect(self.spawn_process_control)
+        self.start_button.clicked.connect(self.start_button_callback)
 
         # Stop button
         self.stop_button = QPushButton()
         self.stop_button.setText("STOP")
         self.stop_button.setEnabled(False)
-        self.stop_button.clicked.connect(self.stop_clicked)
+        self.stop_button.clicked.connect(self.stop_button_callback)
 
         sampling_status_lay.addWidget(self.progress_bar, 0, 0, 1, 4)
         sampling_status_lay.addWidget(sampling_act_label, 1, 0)
@@ -125,17 +124,6 @@ class MainWindow(QMainWindow):
             self.pdish_sel[i].setEnabled(True)
         for i in range(pdish_count, 6):
             self.pdish_sel[i].setEnabled(False)
-
-    def start_button_state_transition(self):
-        """Update the state when the start/pause button is pressed."""
-        match self.state:
-            case State.IDLE:
-                self.state = State.STARTUP
-            case State.PAUSED:
-                self.state = State.RUNNING
-            case State.RUNNING:
-                self.state = State.PAUSED
-        self.update_ui_state()
 
     def set_config_entry(self, entry_enabled):
         self.pdish_count.setReadOnly(not entry_enabled)
@@ -168,10 +156,12 @@ class MainWindow(QMainWindow):
                 self.set_config_entry(False)
                 self.start_button.setText("PAUSE")
 
-    def spawn_process_control(self):
+    def start_button_callback(self):
         """Start the sampling process via a `ProcessControl` instance."""
+
         match self.state:
             case State.IDLE:
+                self.state = State.STARTUP
                 self.init_thread = QThread()
                 self.proc_ctrl_worker = ProcessControlWorker(
                     self.pdish_count.value(),
@@ -204,9 +194,12 @@ class MainWindow(QMainWindow):
 
                 self.init_thread.start()
             case State.RUNNING:
+                self.state = State.PAUSED
                 self.proc_ctrl_worker.pause()
             case State.PAUSED:
+                self.state = State.RUNNING
                 self.proc_ctrl_worker.resume()
+        self.update_ui_state()
 
     def update_progress_max(self, new_max):
         self.progress_bar.setMaximum(new_max)
@@ -231,16 +224,17 @@ class MainWindow(QMainWindow):
         self.state = State.IDLE
         self.update_ui_state()
         self.sampling_act_status_msg.setText(exception)
-        self.progress_bar.setValue(0)
+        self.progress_bar.reset()
         if self.state is State.RUNNING:
             self.proc_ctrl_worker.terminate(polite=False)
 
     def sample_done_callback(self):
         """Update state/UI for task completion."""
+        self.progress_bar.reset()
         self.state = State.IDLE
         self.update_ui_state()
 
-    def stop_clicked(self):
+    def stop_button_callback(self):
         """Handle the stop button being clicked."""
         self.state = State.IDLE
         self.stop_button.setEnabled(False)
@@ -251,6 +245,6 @@ class MainWindow(QMainWindow):
         for i in self.pdish_sel:
             i.setReadOnly(False)
         self.update_status_msg("Terminating process control...")
-        self.progress_bar.setValue(0)
         self.proc_ctrl_worker.terminate(polite=False)
+        self.progress_bar.reset(0)
         self.update_status_msg("Terminated by user!")
