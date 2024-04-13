@@ -5,7 +5,8 @@ build-backend = "hatchling.build"
 [project]
 name = "slate-ui"
 dynamic = ["version"]
-description = 'Utilitarian UI for the colony-picking robot design project'
+description = "Utilitarian UI for the colony-picking robot design project"
+license = {file = "LICENSE"}
 readme = "README.md"
 requires-python = ">=3.11"
 keywords = []
@@ -22,11 +23,24 @@ authors = [
 ]
 classifiers = [
   "Development Status :: 4 - Beta",
+
+  "Environment :: Win32 (MS Windows)",
+  "Environment :: X11 Applications :: Qt",
+
+  "Intended Audience :: Science/Research",
+
+  "License :: OSI Approved :: GNU General Public License v3 (GPLv3)"
+
+  "Operating System :: Microsoft :: Windows :: Windows 11",
+
   "Programming Language :: Python",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: Implementation :: CPython",
   "Programming Language :: Python :: Implementation :: PyPy",
+
+  "Topic :: Scientific/Engineering :: Image Processing",
+  "Topic :: Scientific/Engineering :: Image Recognition",
 ]
 
 [project.urls]
