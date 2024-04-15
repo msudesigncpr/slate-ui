@@ -15,8 +15,8 @@ dependencies = [
   "opencv-python>=4.9.0.80",
   "openpyxl>=3.1.2",
   "pillow>=10.3.0",
-  "libmotorctrl@git+https://github.com/msudesigncpr/libmotorctrl.git#egg=ee15bbe567514d9476b9a814d355c2400d68a060",
-  "libcolonyfind@git+https://github.com/msudesigncpr/libcolonyfind.git#egg=ee15bbe567514d9476b9a814d355c2400d68a060",
+  "libmotorctrl@git+https://github.com/msudesigncpr/libmotorctrl.git#egg=6516f68992d8f6573277d87e7cab64aaa0d039e6",
+  "libcolonyfind@git+https://github.com/msudesigncpr/libcolonyfind.git#egg=e6341969e840b7f2ef2329cb09fe98564fb2d7a0",
 ]
 authors = [
   { name = "William Culhane", email = "will@culhane.top" },
@@ -29,7 +29,7 @@ classifiers = [
 
   "Intended Audience :: Science/Research",
 
-  "License :: OSI Approved :: GNU General Public License v3 (GPLv3)"
+  "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
 
   "Operating System :: Microsoft :: Windows :: Windows 11",
 

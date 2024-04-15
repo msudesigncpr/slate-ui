@@ -14,7 +14,7 @@ from pathlib import Path
 
 from PyQt6.QtCore import QObject, QThread, pyqtSignal
 
-from libcolonyfind import find_colonies
+from libcolonyfind.colony_finder import ColonyFinder
 from libmotorctrl import DriveManager, DriveTarget
 
 
@@ -219,13 +219,21 @@ class ProcessControlWorker(QObject):
         self.annotated_image_dir = self.output_dir / "03_annotated"
         self.csv_out_dir.mkdir()
         self.annotated_image_dir.mkdir()
-        raw_baseplate_coords_dict = find_colonies(
-            self.raw_image_path, self.csv_out_dir, self.annotated_image_dir
-        )  # TODO Clean up the data structures!
+
+        colony_finder = ColonyFinder(self.raw_image_path, self.csv_out_dir)
+        colony_finder.run_full_proc()
+        raw_baseplate_coords_dict = colony_finder.get_coords()
+        annotated_images = colony_finder.annotate_images()
         for petri_dish in self.petri_dishes:
-            annotated_path = self.annotated_image_dir / f"{petri_dish.name}.jpg"
-            if os.path.isfile(annotated_path):
-                petri_dish.annotated_image_path = annotated_path
+            if petri_dish.is_target:
+                petri_dish.annotated_image_path = (
+                    self.annotated_image_dir / f"{petri_dish.name}.jpg"
+                )
+                cv2.imwrite(
+                    str(petri_dish.annotated_image_path),
+                    annotated_images[petri_dish.name],
+                )
+
         colony_count = 0
         for petri_dish in self.petri_dishes:
             if petri_dish.name in raw_baseplate_coords_dict:
@@ -250,32 +258,31 @@ class ProcessControlWorker(QObject):
         for petri_dish in self.petri_dishes:
             if petri_dish.is_target:
                 for colony in petri_dish.colonies:
-                    if colony.x > 38.34:  # TODO Remove this line
-                        logging.info("Sampling from colony %s...", colony.id)
-                        start_time = datetime.now()
-                        self.colony_index.emit(colony.id)
-                        self.status_msg.emit(f"Sampling colony {colony.id + 1}...")
-                        asyncio.run(
-                            self.drive_ctrl.move(
-                                int(colony.x * 10**3),
-                                int(colony.y * 10**3),
-                                int(CONFIG_PARAMETERS["colony_depth"] * 10**3),
-                            )
+                    logging.info("Sampling from colony %s...", colony.id)
+                    start_time = datetime.now()
+                    self.colony_index.emit(colony.id)
+                    self.status_msg.emit(f"Sampling colony {colony.id + 1}...")
+                    asyncio.run(
+                        self.drive_ctrl.move(
+                            int(colony.x * 10**3),
+                            int(colony.y * 10**3),
+                            int(CONFIG_PARAMETERS["colony_depth"] * 10**3),
                         )
+                    )
 
-                        self.status_msg.emit(f"Depositing colony {colony.id + 1}...")
-                        target_well = self.wells[colony.id]
-                        colony.well = target_well.id
-                        logging.info("Moving to target well %s...", target_well.id)
-                        asyncio.run(
-                            self.drive_ctrl.move(
-                                int(target_well.x * 10**3),
-                                int(target_well.y * 10**3),
-                                int(CONFIG_PARAMETERS["well_depth"] * 10**3),
-                            )
+                    self.status_msg.emit(f"Depositing colony {colony.id + 1}...")
+                    target_well = self.wells[colony.id]
+                    colony.well = target_well.id
+                    logging.info("Moving to target well %s...", target_well.id)
+                    asyncio.run(
+                        self.drive_ctrl.move(
+                            int(target_well.x * 10**3),
+                            int(target_well.y * 10**3),
+                            int(CONFIG_PARAMETERS["well_depth"] * 10**3),
                         )
-                        self.sterilize_needle()
-                        colony.sample_duration = datetime.now() - start_time
+                    )
+                    self.sterilize_needle()
+                    colony.sample_duration = datetime.now() - start_time
 
                     if self.drive_ctrl.abort:
                         break

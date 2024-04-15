@@ -70,6 +70,8 @@ class MainWindow(QMainWindow):
         output_config.setLayout(output_config_lay)
 
         # Petri dish name fields
+        # TODO Disallow duplicate names
+        # TODO Sanitize strings (libcolonyfind treats filenames as names)
         self.pdish_sel = []
         for i in range(6):
             pdish_lay, pdish_sel = generate_pdish_layout(i + 1)
