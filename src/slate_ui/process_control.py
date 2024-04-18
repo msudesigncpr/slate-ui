@@ -114,6 +114,9 @@ class ProcessControlWorker(QObject):
             force=True,
             level=logging.INFO,
         )
+        # Also log to console
+        console = logging.StreamHandler()
+        logging.getLogger('').addHandler(console)
 
     def run_full_proc(self, petri_dish_count=4):
         try:
