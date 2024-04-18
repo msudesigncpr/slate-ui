@@ -64,7 +64,12 @@ class ProcessControlWorker(QObject):
     state = pyqtSignal(str)  # Indicates to main process where in execution flow we are
 
     def __init__(
-        self, petri_dish_count, sterilizer_dwell_duration, cooling_duration, parent=None
+        self,
+        petri_dish_names,
+        petri_dish_count,
+        sterilizer_dwell_duration,
+        cooling_duration,
+        parent=None,
     ):
         QThread.__init__(self, parent)
         self.main_thread = QThread.currentThread()
@@ -76,7 +81,7 @@ class ProcessControlWorker(QObject):
             self.petri_dishes.append(
                 PetriDish(
                     id=petri_dish["id"],
-                    name=f"P{petri_dish['id']}",
+                    name=petri_dish_names[petri_dish["id"] - 1],
                     x=petri_dish["x"],
                     y=petri_dish["y"],
                     is_target=False,
@@ -211,6 +216,8 @@ class ProcessControlWorker(QObject):
                     self.raw_image_path / f"{petri_dish.name}.jpg"
                 )
                 cv2.imwrite(str(petri_dish.raw_image_path), image)
+                logging.info("Saved raw image for petri dish %s", petri_dish.name)
+
         self.cam.release()
 
     def locate_valid_colonies(self):

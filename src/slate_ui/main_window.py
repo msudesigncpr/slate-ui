@@ -165,7 +165,11 @@ class MainWindow(QMainWindow):
             case State.IDLE:
                 self.state = State.STARTUP
                 self.init_thread = QThread()
+                pdish_names = []
+                for pdish_name_box in self.pdish_sel:
+                    pdish_names.append(pdish_name_box.text())
                 self.proc_ctrl_worker = ProcessControlWorker(
+                    pdish_names,
                     self.pdish_count.value(),
                     self.dwellt_ster.value(),
                     self.dwellt_cool.value(),
