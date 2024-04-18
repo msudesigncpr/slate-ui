@@ -116,7 +116,7 @@ class ProcessControlWorker(QObject):
         )
         # Also log to console
         console = logging.StreamHandler()
-        logging.getLogger('').addHandler(console)
+        logging.getLogger("").addHandler(console)
 
     def run_full_proc(self, petri_dish_count=4):
         try:
@@ -124,19 +124,28 @@ class ProcessControlWorker(QObject):
             self.init_camera()
             self.state.emit("DRIVE_INIT")
             self.init_drives()
-            self.state.emit("DRIVE_HOME")
-            self.home_drives()
-            self.state.emit("IMG_CAP")
-            self.capture_images()
-            self.state.emit("IMG_PROC")
-            self.locate_valid_colonies()
-            self.state.emit("SAMP_CYC")
-            self.run_sampling_cycle()
-            self.state.emit("SAV_TAB")
-            self.save_tabulated_data()
-            self.state.emit("TERM")
-            self.terminate(polite=True)
-            self.state.emit("DONE")
+            if not self.drive_ctrl.abort:
+                self.state.emit("DRIVE_HOME")
+                self.home_drives()
+            if not self.drive_ctrl.abort:
+                self.state.emit("IMG_CAP")
+                self.capture_images()
+            if not self.drive_ctrl.abort:
+                self.state.emit("IMG_PROC")
+                self.locate_valid_colonies()
+            if not self.drive_ctrl.abort:
+                self.state.emit("SAMP_CYC")
+                self.run_sampling_cycle()
+            if not self.drive_ctrl.abort:
+                self.state.emit("SAV_TAB")
+                self.save_tabulated_data()
+            if not self.drive_ctrl.abort:
+                self.state.emit("TERM")
+                self.terminate(polite=True)
+            if not self.drive_ctrl.abort:
+                self.state.emit("DONE")
+            if self.drive_ctrl.abort:
+                self.status_msg.emit("Run aborted by user!")
         except Exception as e:
             self.moveToThread(self.main_thread)
             self.exception.emit(str(e))
@@ -203,7 +212,7 @@ class ProcessControlWorker(QObject):
                     )
                 )
                 if self.drive_ctrl.abort:
-                    break  # TODO Test this
+                    break
                 # HACK We call `cam.read()` unnecessarily
                 # It is necessary to call `cam.read()` (discarding the result), and
                 # then call `cam.read()` to get the correct image.
@@ -279,6 +288,8 @@ class ProcessControlWorker(QObject):
                             int(CONFIG_PARAMETERS["colony_depth"] * 10**3),
                         )
                     )
+                    if self.drive_ctrl.abort:
+                        break
 
                     self.status_msg.emit(f"Depositing colony {colony.id + 1}...")
                     target_well = self.wells[colony.id]
@@ -291,7 +302,11 @@ class ProcessControlWorker(QObject):
                             int(CONFIG_PARAMETERS["well_depth"] * 10**3),
                         )
                     )
+                    if self.drive_ctrl.abort:
+                        break
                     self.sterilize_needle()
+                    if self.drive_ctrl.abort:
+                        break
                     colony.sample_duration = datetime.now() - start_time
 
                     if self.drive_ctrl.abort:
