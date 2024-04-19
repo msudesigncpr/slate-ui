@@ -132,8 +132,9 @@ class ProcessControlWorker(QObject):
             ]
 
             for state_label, method, args in process_actions:
-                if self.drive_ctrl.abort:
-                    break
+                if hasattr(self, "drive_ctrl"):
+                    if self.drive_ctrl.abort:
+                        break
                 self.state.emit(state_label)
                 # Parse positional arguments
                 if isinstance(args, dict):
