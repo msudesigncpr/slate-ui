@@ -33,7 +33,7 @@ class MainWindow(QMainWindow):
 
         self.setWindowTitle("CPR Slate Interface")
         self.state = State.IDLE
-        #  self.setMinimumSize(1000, 1000)
+        self.setFixedSize(460, 300)
         widget = QWidget()
         layout = QGridLayout(widget)
 
