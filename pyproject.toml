@@ -15,8 +15,8 @@ dependencies = [
   "opencv-python>=4.9.0.80",
   "openpyxl>=3.1.2",
   "pillow>=10.3.0",
-  "libmotorctrl@git+https://github.com/msudesigncpr/libmotorctrl.git#egg=6516f68992d8f6573277d87e7cab64aaa0d039e6",
-  "libcolonyfind@git+https://github.com/msudesigncpr/libcolonyfind.git#egg=7fae1be3d5dbb55c808dafe743e1c98096766254",
+  "libmotorctrl@git+https://github.com/msudesigncpr/libmotorctrl.git@62b10c2f7fbfa43d430129f0747b72b4ced74b77",
+  "libcolonyfind@git+https://github.com/msudesigncpr/libcolonyfind.git@7fae1be3d5dbb55c808dafe743e1c98096766254",
 ]
 authors = [
   { name = "William Culhane", email = "will@culhane.top" },

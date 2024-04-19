@@ -375,12 +375,15 @@ class ProcessControlWorker(QObject):
         workbook.save(self.output_dir / f"run-data-{self.run_id}.xlsx")
 
     def terminate(self, polite=False):
+        logging.info("Terminating process control...")
         if polite:
             self.colony_index.emit(self.total_colonies)
             self.status_msg.emit("Terminating process control...")
         self.cam.release()
+        logging.info("Returning home...")
         if polite:
             asyncio.run(self.drive_ctrl.move(450_000, -90_000, 0))
         asyncio.run(self.drive_ctrl.terminate())
+        logging.info("Process control terminated")
         if polite:
             self.status_msg.emit("Process control terminated!")
