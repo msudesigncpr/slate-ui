@@ -1,5 +1,6 @@
 from enum import Enum
 from functools import partial
+import time
 
 from PyQt6.QtCore import QThread
 from PyQt6.QtGui import QValidator
@@ -26,7 +27,7 @@ class State(Enum):
     IDLE = 0
     STARTUP = 1
     RUNNING = 2
-    PAUSED = 3
+    #  PAUSED = 3
 
 
 class MainWindow(QMainWindow):
@@ -163,22 +164,22 @@ class MainWindow(QMainWindow):
                 self.stop_button.setEnabled(False)
                 self.start_button.setEnabled(True)
                 self.set_config_entry(True)
-                self.start_button.setText("START")
+                #  self.start_button.setText("START")
             case State.STARTUP:
                 self.stop_button.setEnabled(False)
                 self.start_button.setEnabled(False)
                 self.set_config_entry(False)
-                self.start_button.setText("RESUME")
-            case State.PAUSED:
-                self.stop_button.setEnabled(True)
-                self.start_button.setEnabled(True)
-                self.set_config_entry(False)
-                self.start_button.setText("RESUME")
+                #  self.start_button.setText("RESUME")
+            #  case State.PAUSED:
+            #  self.stop_button.setEnabled(True)
+            #  self.start_button.setEnabled(True)
+            #  self.set_config_entry(False)
+            #  self.start_button.setText("RESUME")
             case State.RUNNING:
                 self.stop_button.setEnabled(True)
-                self.start_button.setEnabled(True)
+                self.start_button.setEnabled(False)
                 self.set_config_entry(False)
-                self.start_button.setText("PAUSE")
+                #  self.start_button.setText("PAUSE")
 
     def start_button_callback(self):
         """Start the sampling process via a `ProcessControl` instance."""
@@ -234,12 +235,12 @@ class MainWindow(QMainWindow):
                     self.init_thread.finished.connect(self.init_thread.deleteLater)
 
                     self.init_thread.start()
-            case State.RUNNING:
-                self.state = State.PAUSED
-                self.proc_ctrl_worker.pause()
-            case State.PAUSED:
-                self.state = State.RUNNING
-                self.proc_ctrl_worker.resume()
+            #  case State.RUNNING:
+            #  self.state = State.PAUSED
+            #  self.proc_ctrl_worker.pause()
+            #  case State.PAUSED:
+            #  self.state = State.RUNNING
+            #  self.proc_ctrl_worker.resume()
         self.update_ui_state()
 
     def update_progress_max(self, new_max):
@@ -282,10 +283,12 @@ class MainWindow(QMainWindow):
         self.pdish_count.setReadOnly(False)
         self.dwellt_ster.setReadOnly(False)
         self.dwellt_cool.setReadOnly(False)
-        self.start_button.setText("START")
+        #  self.start_button.setText("START")
         for i in self.pdish_sel:
             i.setReadOnly(False)
         self.update_status_msg("Terminating process control...")
         self.proc_ctrl_worker.terminate(polite=False)
         self.progress_bar.reset()
         self.update_status_msg("Terminated by user!")
+        time.sleep(0.5)  # HACK Race condition with rapid stop/start causing crash
+        self.start_button.setEnabled(True)
