@@ -138,18 +138,16 @@ class MainWindow(QMainWindow):
                 origin_dish.setStyleSheet(
                     """
                         QLineEdit {
-                            background-color: #FFEEEE;
+                            background-color: #fff0f0;
                             border: 1.5px solid red;
-                        }"""
+                        }
+                        QLineEdit:disabled {
+                            border: 0px;
+                        }
+                        """
                 )
             case QValidator.State.Acceptable:
-                origin_dish.setStyleSheet(
-                    """
-                        QLineEdit {
-                            background-color: white;
-                            border-width: 0
-                        }"""
-                )
+                origin_dish.setStyleSheet("")
 
     def set_config_entry(self, entry_enabled):
         self.pdish_count.setReadOnly(not entry_enabled)
