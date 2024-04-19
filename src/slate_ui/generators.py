@@ -8,8 +8,24 @@ from PyQt6.QtWidgets import (
     QDoubleSpinBox,
 )
 
-from PyQt6.QtCore import QRegularExpression
-from PyQt6.QtGui import QRegularExpressionValidator
+from PyQt6.QtCore import pyqtSignal, QRegularExpression
+from PyQt6.QtGui import QRegularExpressionValidator, QValidator
+
+
+class PetriDishValidator(QRegularExpressionValidator):
+    validationChanged = pyqtSignal(QValidator.State)
+
+    def validate(self, input, pos):
+        # First, check against the regex
+        state, input, pos = super().validate(input, pos)
+
+        # Next, check that we aren't empty
+        if not bool(input.strip()):
+            state = QValidator.State.Intermediate
+
+        # TODO We don't check for duplicate entry fields
+        self.validationChanged.emit(state)
+        return state, input, pos
 
 
 def generate_spinbox_layout(label_text, min_bound, max_bound, default_val):
@@ -34,10 +50,10 @@ def generate_pdish_layout(id):
     selection.setMaxLength(12)
     selection.setText(f"P{id}")
 
-    re = QRegularExpression("[a-zA-Z0-9]*")
-    validator = QRegularExpressionValidator(re)
-    selection.setValidator(validator)
+    regex = QRegularExpression("[a-zA-Z0-9]+")
+    pname_validator = PetriDishValidator(regex)
+    selection.setValidator(pname_validator)
 
     layout.addWidget(label)
     layout.addWidget(selection)
-    return layout, selection
+    return layout, selection, pname_validator

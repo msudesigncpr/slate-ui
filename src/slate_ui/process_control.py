@@ -31,7 +31,6 @@ class Colony:
     id: int
     x: float
     y: float
-    is_target: bool
     sample_duration: timedelta
     well: str
 
@@ -42,7 +41,6 @@ class PetriDish:
     name: str
     x: int
     y: int
-    is_target: bool
     raw_image_path: str
     annotated_image_path: str
     colonies: list[Colony] = field(default_factory=list)
@@ -77,14 +75,14 @@ class ProcessControlWorker(QObject):
         self.paused = False
 
         self.petri_dishes = []
-        for petri_dish in CONFIG_LOCATIONS["petri_dishes"]:
+        for petri_dish_index in range(petri_dish_count):
+            petri_dish = CONFIG_LOCATIONS["petri_dishes"][petri_dish_index]
             self.petri_dishes.append(
                 PetriDish(
                     id=petri_dish["id"],
                     name=petri_dish_names[petri_dish["id"] - 1],
                     x=petri_dish["x"],
                     y=petri_dish["y"],
-                    is_target=False,
                     raw_image_path="",
                     annotated_image_path="",
                     colonies=[],
@@ -97,7 +95,6 @@ class ProcessControlWorker(QObject):
                 Well(id=well["id"], x=well["x"], y=well["y"], has_sample=False)
             )
 
-        self.set_petri_dish_count(petri_dish_count)
         self.sterilizer_dwell_duration = sterilizer_dwell_duration
         self.cooling_duration = cooling_duration
 
@@ -154,11 +151,6 @@ class ProcessControlWorker(QObject):
             self.moveToThread(self.main_thread)
             self.finished.emit()
 
-    def set_petri_dish_count(self, petri_dish_count):
-        self.petri_dish_count = petri_dish_count
-        for i in range(petri_dish_count):
-            self.petri_dishes[i].is_target = True
-
     def init_drives(self):
         self.status_msg.emit("Initializing drives...")
         self.drive_ctrl = DriveManager()
@@ -193,42 +185,41 @@ class ProcessControlWorker(QObject):
         # TODO Raise z-axis first
         # If we aren't already at maximum z, the needle will crash
         for petri_dish in self.petri_dishes:
-            if petri_dish.is_target:
-                image_count += 1
-                self.status_msg.emit(
-                    f"Capturing image of Petri dish {petri_dish.id} [{image_count}/{self.petri_dish_count}]..."
+            image_count += 1
+            self.status_msg.emit(
+                f"Capturing image of Petri dish {petri_dish.name} [{image_count}/{len(self.petri_dishes)}]..."
+            )
+            asyncio.run(
+                self.drive_ctrl.move_direct(
+                    int(
+                        (petri_dish.x + CONFIG_PARAMETERS["camera_offset"]["x"])
+                        * 10**3
+                    ),
+                    int(
+                        (petri_dish.y + CONFIG_PARAMETERS["camera_offset"]["y"])
+                        * 10**3
+                    ),
+                    int(50 * 10**3),
                 )
-                asyncio.run(
-                    self.drive_ctrl.move_direct(
-                        int(
-                            (petri_dish.x + CONFIG_PARAMETERS["camera_offset"]["x"])
-                            * 10**3
-                        ),
-                        int(
-                            (petri_dish.y + CONFIG_PARAMETERS["camera_offset"]["y"])
-                            * 10**3
-                        ),
-                        int(50 * 10**3),
-                    )
+            )
+            if self.drive_ctrl.abort:
+                break
+            # HACK We call `cam.read()` unnecessarily
+            # It is necessary to call `cam.read()` (discarding the result), and
+            # then call `cam.read()` to get the correct image.
+            self.cam.read()
+            result, image = self.cam.read()
+            if not result:
+                logging.critical("Failed to capture Petri dish image!")
+                raise Exception(
+                    f"Invalid image capture result for Petri dish {petri_dish.id}: {petri_dish.name}!"
                 )
-                if self.drive_ctrl.abort:
-                    break
-                # HACK We call `cam.read()` unnecessarily
-                # It is necessary to call `cam.read()` (discarding the result), and
-                # then call `cam.read()` to get the correct image.
-                self.cam.read()
-                result, image = self.cam.read()
-                if not result:
-                    logging.critical("Failed to capture Petri dish image!")
-                    raise Exception(
-                        f"Invalid image capture result for Petri dish {petri_dish.id}: {petri_dish.name}!"
-                    )
 
-                petri_dish.raw_image_path = Path(
-                    self.raw_image_path / f"{petri_dish.name}.jpg"
-                )
-                cv2.imwrite(str(petri_dish.raw_image_path), image)
-                logging.info("Saved raw image for petri dish %s", petri_dish.name)
+            petri_dish.raw_image_path = Path(
+                self.raw_image_path / f"{petri_dish.name}.jpg"
+            )
+            cv2.imwrite(str(petri_dish.raw_image_path), image)
+            logging.info("Saved raw image for petri dish %s", petri_dish.name)
 
         self.cam.release()
 
@@ -244,14 +235,13 @@ class ProcessControlWorker(QObject):
         raw_baseplate_coords_dict = colony_finder.get_coords()
         annotated_images = colony_finder.annotate_images()
         for petri_dish in self.petri_dishes:
-            if petri_dish.is_target:
-                petri_dish.annotated_image_path = (
-                    self.annotated_image_dir / f"{petri_dish.name}.jpg"
-                )
-                cv2.imwrite(
-                    str(petri_dish.annotated_image_path),
-                    annotated_images[petri_dish.name],
-                )
+            petri_dish.annotated_image_path = (
+                self.annotated_image_dir / f"{petri_dish.name}.jpg"
+            )
+            cv2.imwrite(
+                str(petri_dish.annotated_image_path),
+                annotated_images[petri_dish.name],
+            )
 
         colony_count = 0
         for petri_dish in self.petri_dishes:
@@ -262,7 +252,6 @@ class ProcessControlWorker(QObject):
                             id=colony_count,
                             x=(petri_dish.x + colony[0]),
                             y=(petri_dish.y + colony[1]),
-                            is_target=True,
                             sample_duration=None,
                             well=None,
                         )
@@ -275,42 +264,41 @@ class ProcessControlWorker(QObject):
         self.sterilize_needle()
 
         for petri_dish in self.petri_dishes:
-            if petri_dish.is_target:
-                for colony in petri_dish.colonies:
-                    logging.info("Sampling from colony %s...", colony.id)
-                    start_time = datetime.now()
-                    self.colony_index.emit(colony.id)
-                    self.status_msg.emit(f"Sampling colony {colony.id + 1}...")
-                    asyncio.run(
-                        self.drive_ctrl.move(
-                            int(colony.x * 10**3),
-                            int(colony.y * 10**3),
-                            int(CONFIG_PARAMETERS["colony_depth"] * 10**3),
-                        )
+            for colony in petri_dish.colonies:
+                logging.info("Sampling from colony %s...", colony.id)
+                start_time = datetime.now()
+                self.colony_index.emit(colony.id)
+                self.status_msg.emit(f"Sampling colony {colony.id + 1}...")
+                asyncio.run(
+                    self.drive_ctrl.move(
+                        int(colony.x * 10**3),
+                        int(colony.y * 10**3),
+                        int(CONFIG_PARAMETERS["colony_depth"] * 10**3),
                     )
-                    if self.drive_ctrl.abort:
-                        break
+                )
+                if self.drive_ctrl.abort:
+                    break
 
-                    self.status_msg.emit(f"Depositing colony {colony.id + 1}...")
-                    target_well = self.wells[colony.id]
-                    colony.well = target_well.id
-                    logging.info("Moving to target well %s...", target_well.id)
-                    asyncio.run(
-                        self.drive_ctrl.move(
-                            int(target_well.x * 10**3),
-                            int(target_well.y * 10**3),
-                            int(CONFIG_PARAMETERS["well_depth"] * 10**3),
-                        )
+                self.status_msg.emit(f"Depositing colony {colony.id + 1}...")
+                target_well = self.wells[colony.id]
+                colony.well = target_well.id
+                logging.info("Moving to target well %s...", target_well.id)
+                asyncio.run(
+                    self.drive_ctrl.move(
+                        int(target_well.x * 10**3),
+                        int(target_well.y * 10**3),
+                        int(CONFIG_PARAMETERS["well_depth"] * 10**3),
                     )
-                    if self.drive_ctrl.abort:
-                        break
-                    self.sterilize_needle()
-                    if self.drive_ctrl.abort:
-                        break
-                    colony.sample_duration = datetime.now() - start_time
+                )
+                if self.drive_ctrl.abort:
+                    break
+                self.sterilize_needle()
+                if self.drive_ctrl.abort:
+                    break
+                colony.sample_duration = datetime.now() - start_time
 
-                    if self.drive_ctrl.abort:
-                        break
+                if self.drive_ctrl.abort:
+                    break
             if self.drive_ctrl.abort:
                 break
 
@@ -351,27 +339,24 @@ class ProcessControlWorker(QObject):
         self.status_msg.emit("Saving run data...")
         workbook = openpyxl.Workbook()
         for petri_dish in self.petri_dishes:
-            if petri_dish.is_target:
-                if petri_dish.id == 1:
-                    active_worksheet = workbook.active
-                else:
-                    active_worksheet = workbook.create_sheet(petri_dish.name)
+            if petri_dish.id == 1:
+                active_worksheet = workbook.active
+            else:
+                active_worksheet = workbook.create_sheet(petri_dish.name)
+            active_worksheet.append(
+                ["Well", "Origin X", "Origin Y", "Cycle Duration (s)"]
+            )
+            for row_num, colony in enumerate(petri_dish.colonies):
                 active_worksheet.append(
-                    ["Well", "Origin X", "Origin Y", "Cycle Duration (s)"]
+                    [
+                        colony.well,
+                        colony.x,
+                        colony.y,
+                        colony.sample_duration.total_seconds(),
+                    ]
                 )
-                for row_num, colony in enumerate(petri_dish.colonies):
-                    active_worksheet.append(
-                        [
-                            colony.well,
-                            colony.x,
-                            colony.y,
-                            colony.sample_duration.total_seconds(),
-                        ]
-                    )
-                    img = ExcelImage(
-                        petri_dish.raw_image_path
-                    )  # TODO Crop before insert
-                    active_worksheet.add_image(img, f"F{row_num + 2}")
+                img = ExcelImage(petri_dish.raw_image_path)  # TODO Crop before insert
+                active_worksheet.add_image(img, f"F{row_num + 2}")
         workbook.save(self.output_dir / f"run-data-{self.run_id}.xlsx")
 
     def terminate(self, polite=False):
@@ -380,8 +365,8 @@ class ProcessControlWorker(QObject):
             self.colony_index.emit(self.total_colonies)
             self.status_msg.emit("Terminating process control...")
         self.cam.release()
-        logging.info("Returning home...")
         if polite:
+            logging.info("Returning home...")
             asyncio.run(self.drive_ctrl.move(450_000, -90_000, 0))
         asyncio.run(self.drive_ctrl.terminate())
         logging.info("Process control terminated")

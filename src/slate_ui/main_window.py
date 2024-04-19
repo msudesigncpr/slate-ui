@@ -1,6 +1,8 @@
 from enum import Enum
+from functools import partial
 
 from PyQt6.QtCore import QThread
+from PyQt6.QtGui import QValidator
 from PyQt6.QtWidgets import (
     QMainWindow,
     QWidget,
@@ -33,7 +35,7 @@ class MainWindow(QMainWindow):
 
         self.setWindowTitle("CPR Slate Interface")
         self.state = State.IDLE
-        self.setFixedSize(460, 300)
+        self.setFixedSize(480, 300)
         widget = QWidget()
         layout = QGridLayout(widget)
 
@@ -70,13 +72,16 @@ class MainWindow(QMainWindow):
         output_config.setLayout(output_config_lay)
 
         # Petri dish name fields
-        # TODO Disallow duplicate names
-        # TODO Sanitize strings (libcolonyfind treats filenames as names)
         self.pdish_sel = []
+        self.pdish_layout = []
         for i in range(6):
-            pdish_lay, pdish_sel = generate_pdish_layout(i + 1)
+            pdish_layout, pdish_sel, pdish_valid = generate_pdish_layout(i + 1)
+            pdish_valid.validationChanged.connect(
+                partial(self.pdish_name_validator_callback, pdish_sel)
+            )
             self.pdish_sel.append(pdish_sel)
-            output_config_lay.addLayout(pdish_lay)
+            self.pdish_layout.append(pdish_layout)
+            output_config_lay.addLayout(pdish_layout)
 
         layout.addWidget(output_config, 0, 1)
 
@@ -127,6 +132,25 @@ class MainWindow(QMainWindow):
         for i in range(pdish_count, 6):
             self.pdish_sel[i].setEnabled(False)
 
+    def pdish_name_validator_callback(self, origin_dish, state):
+        match state:
+            case QValidator.State.Intermediate:
+                origin_dish.setStyleSheet(
+                    """
+                        QLineEdit {
+                            background-color: #FFEEEE;
+                            border: 1.5px solid red;
+                        }"""
+                )
+            case QValidator.State.Acceptable:
+                origin_dish.setStyleSheet(
+                    """
+                        QLineEdit {
+                            background-color: white;
+                            border-width: 0
+                        }"""
+                )
+
     def set_config_entry(self, entry_enabled):
         self.pdish_count.setReadOnly(not entry_enabled)
         self.dwellt_ster.setReadOnly(not entry_enabled)
@@ -163,42 +187,55 @@ class MainWindow(QMainWindow):
 
         match self.state:
             case State.IDLE:
-                self.state = State.STARTUP
-                self.init_thread = QThread()
+                # First, check if the Petri names are valid
                 pdish_names = []
-                for pdish_name_box in self.pdish_sel:
-                    pdish_names.append(pdish_name_box.text())
-                self.proc_ctrl_worker = ProcessControlWorker(
-                    pdish_names,
-                    self.pdish_count.value(),
-                    self.dwellt_ster.value(),
-                    self.dwellt_cool.value(),
-                )
-                self.proc_ctrl_worker.moveToThread(self.init_thread)
+                pdish_names_valid = True
+                for pdish_index in range(self.pdish_count.value()):
+                    pdish_names.append(self.pdish_sel[pdish_index].text())
+                    if not self.pdish_sel[pdish_index].hasAcceptableInput():
+                        pdish_names_valid = False
+                        break
+                if len(pdish_names) != len(set(pdish_names)):
+                    pdish_names_valid = False
 
-                self.init_thread.started.connect(self.proc_ctrl_worker.run_full_proc)
+                if pdish_names_valid:
+                    self.state = State.STARTUP
+                    self.init_thread = QThread()
+                    self.proc_ctrl_worker = ProcessControlWorker(
+                        pdish_names,
+                        self.pdish_count.value(),
+                        self.dwellt_ster.value(),
+                        self.dwellt_cool.value(),
+                    )
+                    self.proc_ctrl_worker.moveToThread(self.init_thread)
 
-                # Task completed callbacks
-                self.proc_ctrl_worker.finished.connect(self.sample_done_callback)
-                self.proc_ctrl_worker.finished.connect(self.init_thread.quit)
-                self.proc_ctrl_worker.finished.connect(
-                    self.proc_ctrl_worker.deleteLater
-                )
+                    self.init_thread.started.connect(
+                        self.proc_ctrl_worker.run_full_proc
+                    )
 
-                # Task error callbacks
-                self.proc_ctrl_worker.exception.connect(self.report_exception)
-                self.proc_ctrl_worker.exception.connect(self.init_thread.quit)
+                    # Task completed callbacks
+                    self.proc_ctrl_worker.finished.connect(self.sample_done_callback)
+                    self.proc_ctrl_worker.finished.connect(self.init_thread.quit)
+                    self.proc_ctrl_worker.finished.connect(
+                        self.proc_ctrl_worker.deleteLater
+                    )
 
-                # Status/state update callbacks
-                self.proc_ctrl_worker.status_msg.connect(self.update_status_msg)
-                self.proc_ctrl_worker.state.connect(self.sample_state_update_callback)
-                self.proc_ctrl_worker.colony_count.connect(self.update_progress_max)
-                self.proc_ctrl_worker.colony_index.connect(self.update_progress)
+                    # Task error callbacks
+                    self.proc_ctrl_worker.exception.connect(self.report_exception)
+                    self.proc_ctrl_worker.exception.connect(self.init_thread.quit)
 
-                # Thread cleanup
-                self.init_thread.finished.connect(self.init_thread.deleteLater)
+                    # Status/state update callbacks
+                    self.proc_ctrl_worker.status_msg.connect(self.update_status_msg)
+                    self.proc_ctrl_worker.state.connect(
+                        self.sample_state_update_callback
+                    )
+                    self.proc_ctrl_worker.colony_count.connect(self.update_progress_max)
+                    self.proc_ctrl_worker.colony_index.connect(self.update_progress)
 
-                self.init_thread.start()
+                    # Thread cleanup
+                    self.init_thread.finished.connect(self.init_thread.deleteLater)
+
+                    self.init_thread.start()
             case State.RUNNING:
                 self.state = State.PAUSED
                 self.proc_ctrl_worker.pause()
