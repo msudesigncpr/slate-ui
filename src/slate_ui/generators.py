@@ -8,6 +8,9 @@ from PyQt6.QtWidgets import (
     QDoubleSpinBox,
 )
 
+from PyQt6.QtCore import QRegularExpression
+from PyQt6.QtGui import QRegularExpressionValidator
+
 
 def generate_spinbox_layout(label_text, min_bound, max_bound, default_val):
     layout = QHBoxLayout()
@@ -23,13 +26,17 @@ def generate_spinbox_layout(label_text, min_bound, max_bound, default_val):
     return layout, spinbox
 
 
-def generate_pdish_layout(name):
+def generate_pdish_layout(id):
     layout = QHBoxLayout()
-    label = QLabel(f"Petri Dish {name}: ")
+    label = QLabel(f"Petri Dish {id}: ")
 
     selection = QLineEdit()
-    selection.setMaxLength(16)
-    selection.setText(f"P{name}")
+    selection.setMaxLength(12)
+    selection.setText(f"P{id}")
+
+    re = QRegularExpression("[a-zA-Z0-9]*")
+    validator = QRegularExpressionValidator(re)
+    selection.setValidator(validator)
 
     layout.addWidget(label)
     layout.addWidget(selection)
