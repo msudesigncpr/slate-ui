@@ -118,33 +118,32 @@ class ProcessControlWorker(QObject):
         console = logging.StreamHandler()
         logging.getLogger("").addHandler(console)
 
-    def run_full_proc(self, petri_dish_count=4):
+    def run_full_proc(self):
         try:
-            self.state.emit("CAM_INIT")
-            self.init_camera()
-            self.state.emit("DRIVE_INIT")
-            self.init_drives()
-            if not self.drive_ctrl.abort:
-                self.state.emit("DRIVE_HOME")
-                self.home_drives()
-            if not self.drive_ctrl.abort:
-                self.state.emit("IMG_CAP")
-                self.capture_images()
-            if not self.drive_ctrl.abort:
-                self.state.emit("IMG_PROC")
-                self.locate_valid_colonies()
-            if not self.drive_ctrl.abort:
-                self.state.emit("SAMP_CYC")
-                self.run_sampling_cycle()
-            if not self.drive_ctrl.abort:
-                self.state.emit("SAV_TAB")
-                self.save_tabulated_data()
-            if not self.drive_ctrl.abort:
-                self.state.emit("TERM")
-                self.terminate(polite=True)
+            process_actions = [
+                ("CAM_INIT", self.init_camera, ()),
+                ("DRIVE_INIT", self.init_drives, ()),
+                ("DRIVE_HOME", self.home_drives, ()),
+                ("IMG_CAP", self.capture_images, ()),
+                ("IMG_PROC", self.locate_valid_colonies, ()),
+                ("SAMP_CYC", self.run_sampling_cycle, ()),
+                ("SAV_TAB", self.save_tabulated_data, ()),
+                ("TERM", self.terminate, {"polite": True}),
+            ]
+
+            for state_label, method, args in process_actions:
+                if self.drive_ctrl.abort:
+                    break
+                self.state.emit(state_label)
+                # Parse positional arguments
+                if isinstance(args, dict):
+                    method(**args)
+                else:
+                    method(*args)
+
             if not self.drive_ctrl.abort:
                 self.state.emit("DONE")
-            if self.drive_ctrl.abort:
+            else:
                 self.status_msg.emit("Run aborted by user!")
         except Exception as e:
             self.moveToThread(self.main_thread)
