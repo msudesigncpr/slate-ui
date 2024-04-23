@@ -80,7 +80,7 @@ class ProcessControlWorker(QObject):
             self.petri_dishes.append(
                 PetriDish(
                     id=petri_dish["id"],
-                    name=petri_dish_names[petri_dish["id"] - 1],
+                    name=f"{petri_dish_index}_{petri_dish_names[petri_dish['id'] - 1]}",
                     x=petri_dish["x"],
                     y=petri_dish["y"],
                     raw_image_path="",
@@ -198,12 +198,10 @@ class ProcessControlWorker(QObject):
             asyncio.run(
                 self.drive_ctrl.move_direct(
                     int(
-                        (petri_dish.x + CONFIG_PARAMETERS["camera_offset"]["x"])
-                        * 10**3
+                        (petri_dish.x + CONFIG_PARAMETERS["camera_offset"]["x"]) * 10**3
                     ),
                     int(
-                        (petri_dish.y + CONFIG_PARAMETERS["camera_offset"]["y"])
-                        * 10**3
+                        (petri_dish.y + CONFIG_PARAMETERS["camera_offset"]["y"]) * 10**3
                     ),
                     int(50 * 10**3),
                 )
