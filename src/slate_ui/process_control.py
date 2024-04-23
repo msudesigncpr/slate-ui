@@ -145,7 +145,10 @@ class ProcessControlWorker(QObject):
                 self.status_msg.emit("Run aborted by user!")
         except Exception as e:
             try:
+                logging.error("Encountered error, trying to save data...")
                 self.save_tabulated_data()
+                self.terminate(polite=False)
+                time.sleep(0.2)  # HACK Ensure Excel file is saved
             finally:
                 logging.error(e)
                 self.exception.emit(str(e))
