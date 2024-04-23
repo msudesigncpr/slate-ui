@@ -259,6 +259,10 @@ class ProcessControlWorker(QObject):
                         )
                     )
                     colony_count += 1
+                if colony_count >= 96:  # Sanity check if too many colonies returned by libcolonyfind
+                    break
+            if colony_count >= 96:
+                break
         self.total_colonies = colony_count
         self.colony_count.emit(self.total_colonies)
 
