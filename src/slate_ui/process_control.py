@@ -355,6 +355,7 @@ class ProcessControlWorker(QObject):
         for petri_dish in self.petri_dishes:
             if petri_dish.id == 1:
                 active_worksheet = workbook.active
+                active_worksheet.title = petri_dish.name
             else:
                 active_worksheet = workbook.create_sheet(petri_dish.name)
             active_worksheet.append(
