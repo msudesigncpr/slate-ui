@@ -144,9 +144,12 @@ class ProcessControlWorker(QObject):
             else:
                 self.status_msg.emit("Run aborted by user!")
         except Exception as e:
-            self.moveToThread(self.main_thread)
-            self.exception.emit(str(e))
-            logging.error(e)
+            try:
+                self.save_tabulated_data()
+            finally:
+                logging.error(e)
+                self.exception.emit(str(e))
+                self.moveToThread(self.main_thread)
         else:
             self.moveToThread(self.main_thread)
             self.finished.emit()
@@ -353,14 +356,15 @@ class ProcessControlWorker(QObject):
                 ["Well", "Origin X", "Origin Y", "Cycle Duration (s)"]
             )
             for row_num, colony in enumerate(petri_dish.colonies):
-                active_worksheet.append(
-                    [
-                        colony.well,
-                        colony.x,
-                        colony.y,
-                        colony.sample_duration.total_seconds(),
-                    ]
-                )
+                if colony.sample_duration is not None:
+                    active_worksheet.append(
+                        [
+                            colony.well,
+                            colony.x,
+                            colony.y,
+                            colony.sample_duration.total_seconds(),
+                        ]
+                    )
                 img = ExcelImage(petri_dish.raw_image_path)  # TODO Crop before insert
                 active_worksheet.add_image(img, f"F{row_num + 2}")
         workbook.save(self.output_dir / f"run-data-{self.run_id}.xlsx")
