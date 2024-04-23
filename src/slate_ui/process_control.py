@@ -207,7 +207,9 @@ class ProcessControlWorker(QObject):
             # HACK We call `cam.read()` unnecessarily
             # It is necessary to call `cam.read()` (discarding the result), and
             # then call `cam.read()` to get the correct image.
-            self.cam.read()
+            result = False
+            while not result:  # Possibly unnecessary
+                result, _ = self.cam.read()
             result, image = self.cam.read()
             if not result:
                 logging.critical("Failed to capture Petri dish image!")
