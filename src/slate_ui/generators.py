@@ -47,7 +47,7 @@ def generate_pdish_layout(id):
     label = QLabel(f"Petri Dish {id}: ")
 
     selection = QLineEdit()
-    selection.setMaxLength(12)
+    selection.setMaxLength(20)
     selection.setText(f"P{id}")
 
     regex = QRegularExpression("[a-zA-Z0-9]+")
