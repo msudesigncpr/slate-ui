@@ -381,7 +381,11 @@ class ProcessControlWorker(QObject):
         self.cam.release()
         if polite:
             logging.info("Returning home...")
-            asyncio.run(self.drive_ctrl.move(450_000, -90_000, 0))
+            self.drive_ctrl.move(
+                int(CONFIG_LOCATIONS["sterilizer"]["x"] * 10**3),
+                int(CONFIG_LOCATIONS["sterilizer"]["y"] * 10**3),
+                0
+            )
         asyncio.run(self.drive_ctrl.terminate())
         logging.info("Process control terminated")
         if polite:
