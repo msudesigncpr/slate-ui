@@ -80,7 +80,7 @@ class ProcessControlWorker(QObject):
             self.petri_dishes.append(
                 PetriDish(
                     id=petri_dish["id"],
-                    name=f"{petri_dish_index}_{petri_dish_names[petri_dish['id'] - 1]}",
+                    name=f"{petri_dish['id']}_{petri_dish_names[petri_dish['id'] - 1]}",
                     x=petri_dish["x"],
                     y=petri_dish["y"],
                     raw_image_path="",
