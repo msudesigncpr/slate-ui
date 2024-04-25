@@ -253,8 +253,6 @@ class MainWindow(QMainWindow):
         """Update state based on on state message from `ProcessControl`."""
         if state_msg == "DRIVE_HOME":
             self.state = State.RUNNING
-        elif state_msg == "TERM":
-            self.progress_bar.setValue(100)
         self.update_ui_state()
 
     def update_status_msg(self, msg):

@@ -139,10 +139,7 @@ class ProcessControlWorker(QObject):
                 else:
                     method(*args)
 
-            if not self.drive_ctrl.abort:
-                self.state.emit("DONE")
-            else:
-                self.status_msg.emit("Run aborted by user!")
+            self.state.emit("DONE")
         except Exception as e:
             try:
                 logging.error("Encountered error, trying to save data...")
@@ -193,15 +190,17 @@ class ProcessControlWorker(QObject):
         for petri_dish in self.petri_dishes:
             image_count += 1
             self.status_msg.emit(
-                f"Capturing image of Petri dish {petri_dish.name} [{image_count}/{len(self.petri_dishes)}]..."
+                f"Capturing image of Petri dish {petri_dish.id} [{image_count}/{len(self.petri_dishes)}]..."
             )
             asyncio.run(
                 self.drive_ctrl.move_direct(
                     int(
-                        (petri_dish.x + CONFIG_PARAMETERS["camera_offset"]["x"]) * 10**3
+                        (petri_dish.x + CONFIG_PARAMETERS["camera_offset"]["x"])
+                        * 10**3
                     ),
                     int(
-                        (petri_dish.y + CONFIG_PARAMETERS["camera_offset"]["y"]) * 10**3
+                        (petri_dish.y + CONFIG_PARAMETERS["camera_offset"]["y"])
+                        * 10**3
                     ),
                     int(50 * 10**3),
                 )
@@ -218,7 +217,7 @@ class ProcessControlWorker(QObject):
             if not result:
                 logging.critical("Failed to capture Petri dish image!")
                 raise Exception(
-                    f"Invalid image capture result for Petri dish {petri_dish.id}: {petri_dish.name}!"
+                    f"Invalid image capture result for Petri dish {petri_dish.id}!"
                 )
 
             petri_dish.raw_image_path = Path(
@@ -369,7 +368,9 @@ class ProcessControlWorker(QObject):
                             colony.sample_duration.total_seconds(),
                         ]
                     )
-                img = ExcelImage(petri_dish.annotated_image_path)  # TODO Crop before insert
+                img = ExcelImage(
+                    petri_dish.annotated_image_path
+                )  # TODO Crop before insert
                 active_worksheet.add_image(img, f"F{row_num + 2}")
         workbook.save(self.output_dir / f"run-data-{self.run_id}.xlsx")
 
@@ -381,10 +382,12 @@ class ProcessControlWorker(QObject):
         self.cam.release()
         if polite:
             logging.info("Returning home...")
-            self.drive_ctrl.move(
-                int(CONFIG_LOCATIONS["sterilizer"]["x"] * 10**3),
-                int(CONFIG_LOCATIONS["sterilizer"]["y"] * 10**3),
-                0
+            asyncio.run(
+                self.drive_ctrl.move(
+                    int(CONFIG_LOCATIONS["sterilizer"]["x"] * 10**3),
+                    int(CONFIG_LOCATIONS["sterilizer"]["y"] * 10**3),
+                    0,
+                )
             )
         asyncio.run(self.drive_ctrl.terminate())
         logging.info("Process control terminated")
