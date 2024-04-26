@@ -17,7 +17,7 @@ dependencies = [
   "openpyxl>=3.1.2",
   "pillow>=10.3.0",
   "libmotorctrl@git+https://github.com/msudesigncpr/libmotorctrl.git@54b59fe9fef838b75cb270932f267b8917fc911f",
-  "libcolonyfind@git+https://github.com/msudesigncpr/libcolonyfind.git@fec0b709a2050a143e63a6e5578d09ab4f32526c",
+  "libcolonyfind@git+https://github.com/msudesigncpr/libcolonyfind.git@438f8002fc2eb73ea1cea20f6448f8b2d07bdc0b",
 ]
 authors = [
   { name = "William Culhane", email = "will@culhane.top" },
