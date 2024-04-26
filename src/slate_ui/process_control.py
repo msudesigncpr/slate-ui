@@ -368,10 +368,10 @@ class ProcessControlWorker(QObject):
                             colony.sample_duration.total_seconds(),
                         ]
                     )
-                img = ExcelImage(
-                    petri_dish.annotated_image_path
-                )  # TODO Crop before insert
-                active_worksheet.add_image(img, f"F{row_num + 2}")
+            img = ExcelImage(
+                petri_dish.annotated_image_path
+            )  # TODO Crop before insert
+            active_worksheet.add_image(img, "F2")
         workbook.save(self.output_dir / f"run-data-{self.run_id}.xlsx")
 
     def terminate(self, polite=False):
